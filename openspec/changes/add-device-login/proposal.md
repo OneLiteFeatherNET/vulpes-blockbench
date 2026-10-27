@@ -2,6 +2,8 @@
 
 Ships as `feat(auth): sign in to vulpes with the device flow`.
 
+Depends on `add-build-toolchain`, which provides the TypeScript sources, the strict checks and the bundled `dist/vulpes.js` that this change extends.
+
 ## Why
 
 Designers work in the Blockbench desktop app and should not have to leave it to get a model into Vulpes. Every request the plugin makes to Vulpes must carry the designer's identity, and the identity provider that Stelaris already uses owns that identity. The plugin must not see the designer's password, so sign-in runs in the system browser through the OAuth 2.0 Device Authorization Grant (RFC 8628), which is designed for clients that cannot show the provider's login page themselves.

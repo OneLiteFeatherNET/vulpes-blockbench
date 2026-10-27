@@ -2,7 +2,7 @@
 
 Ships as `feat(model): open and save models from vulpes`.
 
-Depends on `add-device-login`, which provides the signed-in state and the authorized request function.
+Depends on `add-build-toolchain`, which provides the strict TypeScript build, and on `add-device-login`, which provides the signed-in state and the authorized request function.
 
 ## Why
 
