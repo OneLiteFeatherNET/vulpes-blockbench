@@ -124,6 +124,24 @@ describe('createModel', () => {
     expect(result.ok && result.value.etag, 'the etag').toBe(ETAG);
   });
 
+  it('uses the ETag header when the backend sends one, even if the digest differs', async () => {
+    const { client } = clientWith(() => ({ status: 201, headers: { ETag: '"header"' }, body: ASSET_BODY }));
+    const result = await client.createModel(PROJECT_ID, 'vulpes:item/ruby', MODEL_TEXT);
+    expect(result.ok && result.value.etag, 'the etag').toBe('"header"');
+  });
+
+  it('falls back to a strong ETag built from the body digest when the header is missing', async () => {
+    const { client } = clientWith(() => ({ status: 201, body: ASSET_BODY }));
+    const result = await client.createModel(PROJECT_ID, 'vulpes:item/ruby', MODEL_TEXT);
+    expect(result.ok && result.value.etag, 'the etag').toBe(ETAG);
+  });
+
+  it('reports a create without an ETag header and without a digest as unexpected', async () => {
+    const { client } = clientWith(() => ({ status: 201, body: JSON.stringify({ id: ASSET_ID, key: 'vulpes:item/ruby', fileName: 'ruby.bbmodel', size: 35 }) }));
+    const result = await client.createModel(PROJECT_ID, 'vulpes:item/ruby', MODEL_TEXT);
+    expect(result, 'the result').toEqual({ ok: false, failure: { kind: 'unexpected', status: 201 } });
+  });
+
   it('returns the code of a rejected key', async () => {
     const body = JSON.stringify({
       title: 'Validation failed',
@@ -157,6 +175,24 @@ describe('replaceModel', () => {
     const { client } = clientWith(() => ({ status: 200, headers: { ETag: '"new"' }, body: ASSET_BODY }));
     const result = await client.replaceModel(PROJECT_ID, ASSET_ID, ETAG, 'vulpes:item/ruby', MODEL_TEXT);
     expect(result.ok && result.value.etag, 'the etag').toBe('"new"');
+  });
+
+  it('uses the ETag header of a replacement when the backend sends one, even if the digest differs', async () => {
+    const { client } = clientWith(() => ({ status: 200, headers: { ETag: '"header"' }, body: ASSET_BODY }));
+    const result = await client.replaceModel(PROJECT_ID, ASSET_ID, ETAG, 'vulpes:item/ruby', MODEL_TEXT);
+    expect(result.ok && result.value.etag, 'the etag').toBe('"header"');
+  });
+
+  it('falls back to a strong ETag built from the body digest when a replacement has no ETag header', async () => {
+    const { client } = clientWith(() => ({ status: 200, body: ASSET_BODY }));
+    const result = await client.replaceModel(PROJECT_ID, ASSET_ID, ETAG, 'vulpes:item/ruby', MODEL_TEXT);
+    expect(result.ok && result.value.etag, 'the etag').toBe(ETAG);
+  });
+
+  it('reports a replacement without an ETag header and without a digest as unexpected', async () => {
+    const { client } = clientWith(() => ({ status: 200, body: JSON.stringify({ id: ASSET_ID, key: 'vulpes:item/ruby', fileName: 'ruby.bbmodel', size: 35 }) }));
+    const result = await client.replaceModel(PROJECT_ID, ASSET_ID, ETAG, 'vulpes:item/ruby', MODEL_TEXT);
+    expect(result, 'the result').toEqual({ ok: false, failure: { kind: 'unexpected', status: 200 } });
   });
 
   it('carries the current ETag of a 412 in the problem', async () => {

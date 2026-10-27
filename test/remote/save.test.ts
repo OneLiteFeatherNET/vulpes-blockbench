@@ -111,8 +111,9 @@ describe('createLinked', () => {
     expect(outcome.kind === 'failed' && outcome.message.field, 'the field').toBe('key');
   });
 
-  it('reports a create that answered without a version tag as a failure', async () => {
-    const recorder = fakeFetch(() => ({ status: 201, body: ASSET(NEW_ASSET_ID) }));
+  it('reports a create that answered with neither a version tag nor a digest as a failure', async () => {
+    const withoutDigest = JSON.stringify({ id: NEW_ASSET_ID, key: 'vulpes:item/ruby', fileName: 'ruby.bbmodel', size: 1 });
+    const recorder = fakeFetch(() => ({ status: 201, body: withoutDigest }));
     const outcome = await createLinked(clientFor(recorder), { baseUrl: BASE, projectId: PROJECT_ID }, 'vulpes:item/ruby', TEXT);
     expect(outcome.kind, 'the kind').toBe('failed');
   });

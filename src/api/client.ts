@@ -82,9 +82,14 @@ export function createVulpesClient(options: VulpesClientOptions): VulpesClient {
       : { ok: true, value };
   };
 
+  // Older backends send no ETag on create and replace; the body's SHA-1 is then the strong ETag.
   const storedModel = (result: Extract<Exchange, { kind: 'response' }>): StoredModel | undefined => {
     const asset = parseAssetSummary(parseJsonText(result.text));
-    return asset !== undefined && result.etag !== undefined ? { asset, etag: result.etag } : undefined;
+    if (asset === undefined) {
+      return undefined;
+    }
+    const etag = result.etag ?? parseEntityTag(`"${asset.sha1}"`);
+    return etag === undefined ? undefined : { asset, etag };
   };
 
   const modelBody = (key: string, text: string, withKey: boolean): MultipartBody => ({
