@@ -83,6 +83,13 @@ the active environment is different. The notice after the save says so.
   behaviour of Ctrl+S routing, project restore and the dialogs needs a manual check
   in the Blockbench desktop app against a running backend.
 
+## Install
+
+1. Download `vulpes.js` from the [latest release](https://github.com/OneLiteFeatherNET/vulpes-blockbench/releases/latest).
+2. In Blockbench, open **File > Plugins > Load Plugin from File** and select the downloaded file.
+
+To run a local build instead, see [Load the plugin in Blockbench](#load-the-plugin-in-blockbench).
+
 ## Development
 
 ```sh
@@ -101,4 +108,19 @@ not obfuscated, because the Blockbench plugin store does not accept obfuscated p
 2. In Blockbench, open **File > Plugins > Load Plugin from File** and select
    `dist/vulpes.js`.
 
-The plugin is registered as `vulpes`.
+The plugin is registered as `vulpes`. The planned changes are described in
+`openspec/changes/`.
+
+## Contributing
+
+- Commits and pull request titles follow [Conventional Commits](https://www.conventionalcommits.org),
+  for example `feat(settings): ...` or `fix: ...`. Pull requests are squash-merged, so the
+  title becomes the commit on `main`. Release Please reads these types to pick the next version
+  and write the changelog.
+- Behaviour changes start with an OpenSpec proposal under `openspec/changes/`, merged in its own
+  pull request before the implementation.
+- Run `npm run check` before you push.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
