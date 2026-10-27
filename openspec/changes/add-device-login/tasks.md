@@ -1,5 +1,7 @@
 # Tasks
 
+**Deferred:** do not start these tasks until the shared backend auth change is merged (see `proposal.md`).
+
 ## 1. Spike, plugin skeleton and settings
 
 - [ ] 1.0 Spike: verify that `fetch` from the Blockbench desktop renderer to the issuer's discovery document, device authorization endpoint and token endpoint is not blocked by CORS, and that the response bodies can be read. Record the result and the Blockbench origin in the design. If a call is blocked, apply the fallback in `design.md` (Network access from the renderer) before task 2.1
@@ -16,7 +18,7 @@
 ## 3. Token lifecycle
 
 - [ ] 3.1 Store the tokens through a wrapper around `localStorage` that catches storage errors and treats them as signed out. Test the wrapper with a fake storage
-- [ ] 3.2 Refresh the access token within 30 seconds of expiry, store the rotated refresh token, and expose one `authorizedFetch` function for the other capabilities. Retry once after a `401`. Test both paths with a fake `fetch` and clock
+- [ ] 3.2 Refresh the access token within 30 seconds of expiry, store the rotated refresh token, and expose one `authorizedFetch` function for the other capabilities. It is the token provider that `add-remote-models` accepts. Retry once after a `401`. Test both paths with a fake `fetch` and clock
 - [ ] 3.3 On `invalid_grant`, clear the tokens and enter the signed-out state. On a network error, keep the tokens. Test both outcomes
 - [ ] 3.4 Implement sign-out, which clears the tokens and does not call the backend
 

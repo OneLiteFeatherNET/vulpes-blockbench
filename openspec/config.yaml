@@ -10,8 +10,8 @@ context: |
   `unknown` until a type guard or parser validates them. Designers open and save
   `.bbmodel` files from and to Vulpes.
   Vulpes is the CMS for Minecraft server content; its backend is Vulpes-Backend
-  (Micronaut). The plugin talks only to the Blockbench API of Vulpes-Backend under
-  `/blockbench/v1`, which is a separate API from the web UI API. The contract is
+  (Micronaut). The plugin uses the existing Vulpes asset API of Vulpes-Backend
+  (`/project/{projectId}/asset`), which the web UI also uses. The contract is
   part of each change, so keep specs and tasks in line with it.
   Sign-in uses the OAuth 2.0 Device Authorization Grant (RFC 8628) against the OIDC
   identity provider that Stelaris (the Vulpes web UI) uses. Issuer and client id

@@ -2,7 +2,11 @@
 
 Ships as `feat(auth): sign in to vulpes with the device flow`.
 
-Depends on `add-build-toolchain`, which provides the TypeScript sources, the strict checks and the bundled `dist/vulpes.js` that this change extends.
+**Status: deferred.** This change waits for the shared backend auth change in Vulpes-Backend, which adds token validation together with the OIDC work of Stelaris (the web UI). Until that change exists, the backend has no authentication, and the plugin runs without sign-in. Do not start the tasks below before it is merged.
+
+Depends on `add-build-toolchain`, which provides the TypeScript sources, the strict checks and the bundled `dist/vulpes.js` that this change extends, and on the shared backend auth change, which defines the audience and the scopes the plugin requests.
+
+The plugin is a second public client of the identity provider, next to Stelaris. It needs the same backend audience as Stelaris, and it must request `offline_access` to get a refresh token.
 
 ## Why
 
@@ -20,7 +24,7 @@ Designers work in the Blockbench desktop app and should not have to leave it to 
 Not part of this change:
 
 - Backend validation of the bearer token. This is a separate change in Vulpes-Backend.
-- Opening and saving models. This is `add-remote-models`, which depends on this change.
+- Opening and saving models. This is `add-remote-models`, which does not depend on this change. It sends requests through a token provider, and this change supplies that provider once it exists.
 
 ## Capabilities
 
@@ -36,5 +40,5 @@ None. This repository has no existing specs.
 
 - **Code**: the sign-in, token and settings modules under `src/`, and the registration in `src/plugin.ts`. The TypeScript toolchain comes from `add-build-toolchain`.
 - **Identity provider**: the client must be allowed to use the device flow, and the provider must issue refresh tokens for the scopes the backend requires.
-- **Backend**: none in this change. The backend accepts bearer tokens in a separate change.
+- **Backend**: none in this change. The shared backend auth change (Vulpes-Backend, with Stelaris OIDC) is a prerequisite and is tracked there.
 - **Security**: tokens are kept in browser storage that the local user profile can read. The trade-off is documented in `design.md`.
