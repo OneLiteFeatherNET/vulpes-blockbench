@@ -127,6 +127,8 @@ declare const Blockbench: {
   showMessageBox: (options: MessageBoxOptions, callback?: (button: number | string) => void) => void;
   /** Subscribes to a Blockbench event. The returned object removes the listener. */
   on: (event: string, callback: () => void) => { delete(): void };
+  /** Adds a stylesheet (js/api.ts:245). The returned handle removes it again. */
+  addCSS: (css: string, layer?: string) => { delete(): void };
 };
 
 declare const Language: {
