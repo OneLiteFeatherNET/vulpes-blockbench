@@ -7,10 +7,11 @@ import type { EnvironmentService } from '../environment/service';
 import { listAllProjects } from '../remote/catalog';
 import { MODEL_PAGE_SIZE } from '../remote/model-list';
 import { describeFailure, type ApiFailure } from '../problem';
-import type { PanelError, PanelResult, VulpesPanelHost } from './panel/host';
+import type { LiveSnapshot, PanelError, PanelResult, VulpesPanelHost } from './panel/host';
 import { errorMessage, quickMessage } from './feedback';
-import { currentService } from './blockbench-storage';
+import { currentService, storedSignalingHost } from './blockbench-storage';
 import { subscribeVulpesChange } from './change-bus';
+import { joinLiveSession, leaveLiveSession, liveBackendUnsupported, liveSessionView, startLiveSession } from './live-editing';
 import { openAsset } from './open-from-vulpes';
 import { linkOf } from './project-link';
 import { clientFor, messageText, notConfigured, originOf, runAction } from './remote-context';
@@ -23,6 +24,15 @@ function failed(failure: ApiFailure): { readonly ok: false; readonly error: Pane
 
 function unconfigured(service: EnvironmentService): { readonly ok: false; readonly error: PanelError } {
   return { ok: false, error: { message: messageText(notConfigured(service)) } };
+}
+
+/** The project a live action runs on, or the refusal when it is not linked to Vulpes. */
+function linkedProject(): { readonly ok: true; readonly project: BlockbenchProject } | { readonly ok: false; readonly error: PanelError } {
+  const project = Project;
+  if (project === null || project === undefined || linkOf(project) === undefined) {
+    return { ok: false, error: { message: tl('vulpes.live.not_linked') } };
+  }
+  return { ok: true, project };
 }
 
 /** Builds the host the sidebar panel is created with. Each call reads the stored settings again. */
@@ -102,6 +112,38 @@ export function createPanelHost(): VulpesPanelHost {
         }
         await startSaveNewToVulpes(currentService());
       });
+    },
+
+    liveSnapshot: (): LiveSnapshot => {
+      const project = Project;
+      const record = project === null || project === undefined ? undefined : linkOf(project);
+      return {
+        environmentAvailable: storedSignalingHost(currentService().activeProfile().id) !== '',
+        backendAvailable: record === undefined || !liveBackendUnsupported(record.baseUrl),
+        session: liveSessionView(),
+      };
+    },
+
+    startLive: (): PanelResult<void> => {
+      const linked = linkedProject();
+      if (!linked.ok) {
+        return linked;
+      }
+      startLiveSession(linked.project);
+      return { ok: true, value: undefined };
+    },
+
+    joinLive: (): PanelResult<void> => {
+      const linked = linkedProject();
+      if (!linked.ok) {
+        return linked;
+      }
+      joinLiveSession(linked.project);
+      return { ok: true, value: undefined };
+    },
+
+    leaveLive: () => {
+      leaveLiveSession();
     },
 
     currentLink: () => {

@@ -96,6 +96,23 @@ const PANEL_TEMPLATE = `
       </div>
     </div>
 
+    <div class="vulpes_live">
+      <p class="vulpes_note">{{ t('vulpes.live.section.title') }}</p>
+      <p v-if="view.live.state.kind === 'not-linked'" class="vulpes_note">{{ t('vulpes.live.not_linked') }}</p>
+      <p v-else-if="view.live.state.kind === 'unavailable' && view.live.state.reason === 'environment'" class="vulpes_note">{{ t('vulpes.live.unavailable.environment') }}</p>
+      <p v-else-if="view.live.state.kind === 'unavailable'" class="vulpes_note">{{ t('vulpes.live.unavailable.backend') }}</p>
+      <p v-else-if="view.live.state.kind === 'available'" class="vulpes_note">{{ t('vulpes.live.hosted_by', [view.live.state.host]) }}</p>
+      <p v-else-if="view.live.state.kind === 'hosting'" class="vulpes_note">{{ t('vulpes.live.participants', [view.live.state.participants]) }}</p>
+      <p v-else-if="view.live.state.kind === 'joining'" class="vulpes_note">{{ t('vulpes.live.joining') }}</p>
+      <p v-else-if="view.live.state.kind === 'joined'" class="vulpes_note">{{ t('vulpes.live.joined') }}</p>
+      <p v-if="view.live.error !== undefined" class="vulpes_note vulpes_error">{{ t('vulpes.panel.error', view.live.error) }}</p>
+      <div class="vulpes_row">
+        <button v-if="view.live.state.kind === 'idle'" class="vulpes_button" @click="startLive()">{{ t('vulpes.live.start') }}</button>
+        <button v-if="view.live.state.kind === 'available'" class="vulpes_button" @click="joinLive()">{{ t('vulpes.live.join') }}</button>
+        <button v-if="view.live.state.kind === 'hosting' || view.live.state.kind === 'joining' || view.live.state.kind === 'joined'" class="vulpes_button" @click="leaveLive()">{{ t('vulpes.live.leave') }}</button>
+      </div>
+    </div>
+
     <div class="vulpes_footer">
       <p v-if="view.link.kind === 'linked'" class="vulpes_note">{{ t('vulpes.panel.linked_to', [view.link.key, t('vulpes.panel.' + view.link.environment)]) }}</p>
       <p v-else class="vulpes_note">{{ t('vulpes.panel.not_linked') }}</p>
@@ -151,6 +168,15 @@ export function createVulpesPanel(host: VulpesPanelHost): { dispose(): void } {
         },
         saveCurrentAsNew: () => {
           controller.saveCurrentAsNew();
+        },
+        startLive: () => {
+          controller.startLive();
+        },
+        joinLive: () => {
+          controller.joinLive();
+        },
+        leaveLive: () => {
+          controller.leaveLive();
         },
         assignItem: () => {
           runAction(() => startAssignItem());

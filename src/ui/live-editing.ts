@@ -50,6 +50,7 @@ interface LiveEditing {
   join(project: BlockbenchProject): void;
   leave(): void;
   view(): SessionView;
+  backendUnsupported(baseUrl: string): boolean;
   dispose(): void;
 }
 
@@ -107,6 +108,8 @@ function createLiveEditing(): LiveEditing {
 
   const reportUnavailable = (): void => {
     errorMessage(tl('vulpes.live.unavailable.backend'));
+    // The panel reads the backend state at each render, so it must render again.
+    emitVulpesChange();
   };
 
   const reportFailure = (failure: ApiFailure): void => {
@@ -447,6 +450,7 @@ function createLiveEditing(): LiveEditing {
     join,
     leave,
     view: () => view,
+    backendUnsupported: (baseUrl) => unsupportedBase === baseUrl,
     dispose,
   };
 }
@@ -483,4 +487,9 @@ export function leaveLiveSession(): void {
 /** The state the panel shows. It is `none` while live editing is not registered. */
 export function liveSessionView(): SessionView {
   return current?.view() ?? initialSessionView;
+}
+
+/** True when the backend at this base URL answered that the live-session routes do not exist. */
+export function liveBackendUnsupported(baseUrl: string): boolean {
+  return current?.backendUnsupported(baseUrl) ?? false;
 }

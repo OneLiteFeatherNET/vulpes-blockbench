@@ -4,7 +4,7 @@
 
 import type { AssetSummary, ProjectSummary } from '../../api/dto';
 import type { ProfileId } from '../../environment/profiles';
-import type { PanelEnvironment, PanelLink, VulpesPanelHost } from './host';
+import type { LiveSnapshot, PanelEnvironment, PanelLink, VulpesPanelHost } from './host';
 
 export type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -33,6 +33,22 @@ export interface ModelsView {
   readonly error: string | undefined;
 }
 
+/** What the live section shows. `not-linked` and `unavailable` come before any session state. */
+export type LiveState =
+  | { readonly kind: 'not-linked' }
+  | { readonly kind: 'unavailable'; readonly reason: 'environment' | 'backend' }
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'available'; readonly host: string }
+  | { readonly kind: 'hosting'; readonly participants: number }
+  | { readonly kind: 'joining' }
+  | { readonly kind: 'joined' };
+
+export interface LiveView {
+  readonly state: LiveState;
+  /** The message of the last refused start or join. Cleared by the next accepted action. */
+  readonly error: string | undefined;
+}
+
 export interface PanelViewState {
   readonly environment: EnvironmentView;
   readonly link: LinkView;
@@ -44,6 +60,7 @@ export interface PanelViewState {
   readonly visibleModels: readonly AssetSummary[];
   readonly testing: boolean;
   readonly openingModelId: string | undefined;
+  readonly live: LiveView;
 }
 
 export interface PanelController {
@@ -59,6 +76,12 @@ export interface PanelController {
   openModel(model: AssetSummary): Promise<void>;
   testConnection(): Promise<void>;
   saveCurrentAsNew(): void;
+  /** Starts a live session on the linked project. Does nothing unless the live state is idle. */
+  startLive(): void;
+  /** Joins the registered session. Does nothing unless a session is available. */
+  joinLive(): void;
+  /** Leaves the running session. Does nothing when no session runs. */
+  leaveLive(): void;
 }
 
 interface ModelsState {
@@ -78,6 +101,7 @@ interface InternalState {
   readonly models: ModelsState;
   readonly testing: boolean;
   readonly openingModelId: string | undefined;
+  readonly liveError: string | undefined;
 }
 
 const NO_MODELS: ModelsState = { items: [], nextPage: 0, hasMore: false, status: 'idle', error: undefined };
@@ -111,7 +135,33 @@ function pickSelection(current: string | undefined, projects: readonly ProjectSu
   return projects[0]?.id;
 }
 
-function toView(state: InternalState): PanelViewState {
+/** The live section as the controller shows it. The session comes from the host, the link from the state. */
+export function liveStateView(link: PanelLink | undefined, snapshot: LiveSnapshot): LiveState {
+  if (link === undefined) {
+    return { kind: 'not-linked' };
+  }
+  if (!snapshot.environmentAvailable) {
+    return { kind: 'unavailable', reason: 'environment' };
+  }
+  if (!snapshot.backendAvailable) {
+    return { kind: 'unavailable', reason: 'backend' };
+  }
+  const session = snapshot.session;
+  switch (session.kind) {
+    case 'none':
+      return { kind: 'idle' };
+    case 'available':
+      return { kind: 'available', host: session.host };
+    case 'hosting':
+      return { kind: 'hosting', participants: session.participants };
+    case 'joining':
+      return { kind: 'joining' };
+    case 'joined':
+      return { kind: 'joined' };
+  }
+}
+
+function toView(state: InternalState, snapshot: LiveSnapshot): PanelViewState {
   return {
     environment: environmentView(state.env),
     link: linkView(state.link),
@@ -122,6 +172,7 @@ function toView(state: InternalState): PanelViewState {
     visibleModels: visibleModels(state.models.items, state.search),
     testing: state.testing,
     openingModelId: state.openingModelId,
+    live: { state: liveStateView(state.link, snapshot), error: state.liveError },
   };
 }
 
@@ -135,15 +186,22 @@ export function createPanelController(host: VulpesPanelHost, render: (view: Pane
     models: NO_MODELS,
     testing: false,
     openingModelId: undefined,
+    liveError: undefined,
   };
   // A request answers only if no newer request of its kind started meanwhile.
   // Environment switches invalidate everything; a new selection invalidates the models.
   let environmentGeneration = 0;
   let modelGeneration = 0;
 
+  // The live section is read from the host at each render, so a change of the session or of the
+  // backend shows on the next render without the controller keeping a copy of it.
   function update(patch: Partial<InternalState>): void {
     state = { ...state, ...patch };
-    render(toView(state));
+    render(toView(state, host.liveSnapshot()));
+  }
+
+  function currentLive(): LiveState {
+    return liveStateView(state.link, host.liveSnapshot());
   }
 
   async function fetchPage(projectId: string, page: number, base: readonly AssetSummary[]): Promise<void> {
@@ -191,7 +249,7 @@ export function createPanelController(host: VulpesPanelHost, render: (view: Pane
   }
 
   return {
-    current: () => toView(state),
+    current: () => toView(state, host.liveSnapshot()),
 
     refresh: () => reload(true),
 
@@ -252,6 +310,31 @@ export function createPanelController(host: VulpesPanelHost, render: (view: Pane
 
     saveCurrentAsNew(): void {
       host.saveCurrentAsNew();
+    },
+
+    startLive(): void {
+      if (currentLive().kind !== 'idle') {
+        return;
+      }
+      const result = host.startLive();
+      update({ liveError: result.ok ? undefined : result.error.message });
+    },
+
+    joinLive(): void {
+      if (currentLive().kind !== 'available') {
+        return;
+      }
+      const result = host.joinLive();
+      update({ liveError: result.ok ? undefined : result.error.message });
+    },
+
+    leaveLive(): void {
+      const kind = currentLive().kind;
+      if (kind !== 'hosting' && kind !== 'joining' && kind !== 'joined') {
+        return;
+      }
+      host.leaveLive();
+      update({ liveError: undefined });
     },
   };
 }

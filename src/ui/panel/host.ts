@@ -4,6 +4,7 @@
 
 import type { AssetSummary, ProjectSummary } from '../../api/dto';
 import type { ProfileId } from '../../environment/profiles';
+import type { SessionView } from '../../live/session-state';
 
 /** The environment the panel shows in its badge. */
 export interface PanelEnvironment {
@@ -30,6 +31,15 @@ export interface ModelPage {
   readonly hasMore: boolean;
 }
 
+/** What the live section needs from the environment and the session, read at each render. */
+export interface LiveSnapshot {
+  /** False when the active environment has no signaling host. */
+  readonly environmentAvailable: boolean;
+  /** False when the backend of the linked model answered that the live-session routes do not exist. */
+  readonly backendAvailable: boolean;
+  readonly session: SessionView;
+}
+
 export interface VulpesPanelHost {
   readonly activeEnvironment: () => PanelEnvironment;
   /** Tests the active environment and shows the outcome itself. */
@@ -42,6 +52,13 @@ export interface VulpesPanelHost {
   /** Starts the "Save to Vulpes" flow for the selected project. */
   readonly saveCurrentAsNew: () => void;
   readonly currentLink: () => PanelLink | undefined;
+  readonly liveSnapshot: () => LiveSnapshot;
+  /** Starts a live session on the selected project. Refusals are returned; the module reports its own failures. */
+  readonly startLive: () => PanelResult<void>;
+  /** Joins the registered session of the selected project. */
+  readonly joinLive: () => PanelResult<void>;
+  /** Leaves the session this instance runs, as a host or as a guest. */
+  readonly leaveLive: () => void;
   /** Notifies when the environment, the selected project or its link changed. Returns the unsubscribe. */
   readonly onChange: (listener: () => void) => () => void;
 }
