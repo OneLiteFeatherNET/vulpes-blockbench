@@ -7,7 +7,7 @@ Plugin.register('vulpes', {
   title: 'Vulpes',
   author: 'OneLiteFeather',
   description: 'Open and save Blockbench models from and to Vulpes.',
-  version: '0.1.0',
+  version: __PLUGIN_VERSION__,
   variant: 'desktop',
   onload() {
     mountVulpesUi();
