@@ -1,8 +1,9 @@
-// The three plugin settings, in the category `general`. The plugin owns them, so they
+// The plugin settings, in the category `general`. The plugin owns them, so they
 // appear in the plugin's own Settings tab and under General in Preferences. No
 // category is created, because Settings.addCategory needs the settings dialog first.
 
 import { DEFAULT_DEV_BASE_URL, DEFAULT_PROD_BASE_URL, isProfileId, requiresConfirmation, type ProfileId } from '../environment/profiles';
+import { DEFAULT_DEV_SIGNALING_HOST, DEFAULT_PROD_SIGNALING_HOST } from '../live/signaling-settings';
 import { SETTING_IDS } from './blockbench-storage';
 import { emitVulpesChange } from './change-bus';
 import { confirmMessage } from './feedback';
@@ -73,10 +74,30 @@ export function registerPluginSettings(): () => void {
     plugin: 'vulpes',
     onChange: emitVulpesChange,
   });
+  const devHost = new Setting(SETTING_IDS.devSignalingHost, {
+    name: tl('vulpes.live.setting.dev_host.name'),
+    description: tl('vulpes.live.setting.dev_host.description'),
+    category: 'general',
+    type: 'text',
+    value: DEFAULT_DEV_SIGNALING_HOST,
+    plugin: 'vulpes',
+    onChange: emitVulpesChange,
+  });
+  const prodHost = new Setting(SETTING_IDS.prodSignalingHost, {
+    name: tl('vulpes.live.setting.prod_host.name'),
+    description: tl('vulpes.live.setting.prod_host.description'),
+    category: 'general',
+    type: 'text',
+    value: DEFAULT_PROD_SIGNALING_HOST,
+    plugin: 'vulpes',
+    onChange: emitVulpesChange,
+  });
 
   return () => {
     active.delete();
     dev.delete();
     prod.delete();
+    devHost.delete();
+    prodHost.delete();
   };
 }
