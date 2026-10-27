@@ -40,7 +40,7 @@ Versions were checked with `npm view` on 2026-10-27.
 | `typescript-eslint` | 8.72.1 | Latest. Provides `strictTypeChecked` and `stylisticTypeChecked`. |
 | `vitest` | 5.0.5 | Latest. Engines `^22.12.0 \|\| ^24 \|\| >=26`, which covers the Node 22 floor. |
 | `vite` | 8.3.5 | Latest. `vitest` declares it as a required peer (`^6.4 \|\| ^7 \|\| ^8`), so it is pinned here rather than left to npm. |
-| `@types/node` | 22.20.5 | Latest 22.x. Matches the minimum Node version of the project. Needed by Vite's type declarations. |
+| `@types/node` | 22.20.5 | Latest 22.x. Matches the minimum Node version of the project. Needed by Vite's type declarations, and provides the `fetch` types because the DOM library is not used. |
 
 `package.json` sets `"type": "module"`, `"private": true` and `"engines": { "node": ">=22" }`.
 
@@ -62,6 +62,11 @@ with the options that are set (`title`, `author`, `description`, `version`, `var
 `noUnusedLocals`, `noUnusedParameters`, `forceConsistentCasingInFileNames` and
 `allowJs: false`. `noEmit` is set, because esbuild writes the output. The `include`
 list covers `src`, `test` and `vitest.config.ts`.
+
+The `lib` is `ES2022` without the DOM library. The DOM typings declare a global
+`Plugin` that clashes with the Blockbench declaration, and the code does not need
+DOM types yet. `fetch`, `Response` and `URL` come from `@types/node`. A later change
+that needs DOM types, such as the dialogs, must resolve this clash first.
 
 ### Lint rules
 `eslint.config.mjs` uses the flat config with `eslint:recommended`,
