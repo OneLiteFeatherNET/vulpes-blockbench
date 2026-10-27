@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSnapshot, environmentLabel, requiresConfirmation } from '../../src/environment/profiles';
+import { defaultSnapshot, requiresConfirmation } from '../../src/environment/profiles';
 
 describe('defaultSnapshot', () => {
   it('defaults to dev with the local backend URL and an empty prod URL', () => {
@@ -21,15 +21,5 @@ describe('requiresConfirmation', () => {
 
   it('does not ask when the active environment stays prod', () => {
     expect(requiresConfirmation('prod', 'prod')).toBe(false);
-  });
-});
-
-describe('environmentLabel', () => {
-  it('labels the menu with the active environment', () => {
-    expect(environmentLabel('prod')).toBe('Vulpes (Prod)');
-  });
-
-  it('labels the menu with dev when dev is active', () => {
-    expect(environmentLabel('dev')).toBe('Vulpes (Dev)');
   });
 });

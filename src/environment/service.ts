@@ -1,34 +1,19 @@
-import {
-  type EnvironmentProfile,
-  type EnvironmentSnapshot,
-  type ProfileId,
-  requiresConfirmation,
-} from './profiles';
-import { requireBaseUrl, type ConfiguredProfile, type UrlValidation, validateBaseUrl } from './validation';
-import { loadSnapshot, saveSnapshot, type EnvironmentStorage } from './storage';
+import type { EnvironmentProfile, EnvironmentSnapshot } from './profiles';
+import { requireBaseUrl, type ConfiguredProfile } from './validation';
+import { loadSnapshot, type EnvironmentStorage } from './storage';
 
-export type SwitchResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly reason: 'confirmation-required' };
-
+/**
+ * A read-only view of the environment settings. The settings themselves are the store:
+ * the designer changes them in the plugin settings, and each call here reads them again.
+ */
 export interface EnvironmentService {
   snapshot(): EnvironmentSnapshot;
   activeProfile(): EnvironmentProfile;
   configuredActiveProfile(): ConfiguredProfile;
-  /** Validates and stores a base URL. An invalid value changes nothing. */
-  setBaseUrl(profile: ProfileId, raw: string): UrlValidation;
-  /** Switches the active environment. A switch to `prod` needs `confirmed`. */
-  switchTo(to: ProfileId, confirmed: boolean): SwitchResult;
 }
 
-/** Creates a service with its own state. Each caller passes its own storage. */
 export function createEnvironmentService(storage: EnvironmentStorage): EnvironmentService {
-  let current: EnvironmentSnapshot = loadSnapshot(storage);
-
-  const commit = (next: EnvironmentSnapshot): void => {
-    current = next;
-    saveSnapshot(storage, next);
-  };
+  const current: EnvironmentSnapshot = loadSnapshot(storage);
 
   const profileOf = (snapshot: EnvironmentSnapshot): EnvironmentProfile => ({
     id: snapshot.active,
@@ -39,22 +24,5 @@ export function createEnvironmentService(storage: EnvironmentStorage): Environme
     snapshot: () => current,
     activeProfile: () => profileOf(current),
     configuredActiveProfile: () => requireBaseUrl(profileOf(current)),
-    setBaseUrl(profile, raw) {
-      const result = validateBaseUrl(raw, profile);
-      if (result.ok) {
-        commit({
-          ...current,
-          baseUrls: { ...current.baseUrls, [profile]: result.value },
-        });
-      }
-      return result;
-    },
-    switchTo(to, confirmed) {
-      if (requiresConfirmation(current.active, to) && !confirmed) {
-        return { ok: false, reason: 'confirmation-required' };
-      }
-      commit({ ...current, active: to });
-      return { ok: true };
-    },
   };
 }

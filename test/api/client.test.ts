@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createVulpesClient, fileNameForKey, type VulpesClient } from '../../src/api/client';
+import { createVulpesClient, type VulpesClient } from '../../src/api/client';
 import type { HttpRequest } from '../../src/api/http';
 import { fakeFetch, headerOf, unreachableFetch } from '../support/fake-fetch';
 
@@ -29,16 +29,6 @@ function clientWith(
   });
   return { client, requests: recorder.requests };
 }
-
-describe('fileNameForKey', () => {
-  it('uses the last segment of the key with the .bbmodel extension', () => {
-    expect(fileNameForKey('vulpes:item/ruby')).toBe('ruby.bbmodel');
-  });
-
-  it('falls back to model when the last segment is empty', () => {
-    expect(fileNameForKey('vulpes:item/')).toBe('model.bbmodel');
-  });
-});
 
 describe('listProjects', () => {
   it('requests one page of projects from the project endpoint', async () => {

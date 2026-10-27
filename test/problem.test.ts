@@ -100,22 +100,17 @@ describe('problemFromResponse', () => {
 });
 
 describe('describeProblem', () => {
-  it('tells the designer that the project no longer exists', () => {
-    expect(describeProblem(problem({ status: 404, code: 'PROJECT_NOT_FOUND' })).text).toContain('no longer exists');
+  it('names the message of a missing project', () => {
+    expect(describeProblem(problem({ status: 404, code: 'PROJECT_NOT_FOUND' })).key).toBe('vulpes.problem.project_not_found');
   });
 
-  it('tells the designer that the model was deleted and offers a copy', () => {
-    const message = describeProblem(problem({ status: 404, code: 'RESOURCE_NOT_FOUND' })).text;
-    expect(message).toContain('deleted in Vulpes');
-    expect(message).toContain('Save as copy');
+  it('names the message of a deleted model, which offers a copy', () => {
+    expect(describeProblem(problem({ status: 404, code: 'RESOURCE_NOT_FOUND' })).key).toBe('vulpes.problem.model_deleted');
   });
 
-  it('attaches a key violation to the key field and shows its message', () => {
-    const message = describeProblem(
-      problem({ status: 400, code: 'VALIDATION_FAILED', violations: [KEY_VIOLATION] }),
-    );
-    expect(message.field, 'the field').toBe('key');
-    expect(message.text).toBe(KEY_VIOLATION.message);
+  it('attaches a key violation to the key field and passes its message as a parameter', () => {
+    const message = describeProblem(problem({ status: 400, code: 'VALIDATION_FAILED', violations: [KEY_VIOLATION] }));
+    expect(message, 'the message').toEqual({ key: 'vulpes.problem.violation', params: [KEY_VIOLATION.message], field: 'key' });
   });
 
   it('shows a file violation as a rejected model file', () => {
@@ -126,86 +121,73 @@ describe('describeProblem', () => {
         violations: [{ field: 'file', code: 'ASSET_INVALID_CONTENT', message: 'is not a JSON object' }],
       }),
     );
-    expect(message.field, 'the field').toBe('file');
-    expect(message.text).toContain('rejected the model file');
-    expect(message.text).toContain('is not a JSON object');
+    expect(message, 'the message').toEqual({ key: 'vulpes.problem.file_rejected', params: ['is not a JSON object'], field: 'file' });
   });
 
   it('describes a validation failure without a field violation generically', () => {
     const message = describeProblem(problem({ status: 400, code: 'VALIDATION_FAILED' }));
-    expect(message.field, 'the field').toBeUndefined();
-    expect(message.text).toContain('Vulpes rejected the request');
+    expect(message, 'the message').toEqual({ key: 'vulpes.problem.validation', params: [] });
   });
 
-  it('attaches a key conflict to the key field and explains a possible earlier save', () => {
+  it('attaches a key conflict to the key field', () => {
     const message = describeProblem(problem({ status: 409, code: 'RESOURCE_CONFLICT' }));
-    expect(message.field, 'the field').toBe('key');
-    expect(message.text).toContain('already exists');
-    expect(message.text).toContain('open the model from Vulpes');
+    expect(message, 'the message').toEqual({ key: 'vulpes.problem.key_conflict', params: [], field: 'key' });
   });
 
   it('describes a precondition failure as a changed model', () => {
-    const message = describeProblem(problem({ status: 412, code: 'ASSET_PRECONDITION_FAILED' }));
-    expect(message.text).toContain('changed in Vulpes');
+    expect(describeProblem(problem({ status: 412, code: 'ASSET_PRECONDITION_FAILED' })).key).toBe('vulpes.problem.changed');
   });
 
-  it('shows the detail of a request error and names it as a plugin bug', () => {
+  it('passes the status and the detail of a request error, which is a plugin bug', () => {
     const message = describeProblem(
       problem({ status: 400, code: 'INVALID_REQUEST', detail: 'The file part is missing.' }),
     );
-    expect(message.text).toContain('plugin bug');
-    expect(message.text).toContain('The file part is missing.');
+    expect(message, 'the message').toEqual({
+      key: 'vulpes.problem.plugin_bug',
+      params: ['400', 'The file part is missing.'],
+    });
   });
 
-  it('shows the trace id of an internal error', () => {
-    const message = describeProblem(
-      problem({ status: 500, code: 'INTERNAL_ERROR', traceId: 'trace-42' }),
-    );
-    expect(message.text).toContain('trace-42');
+  it('passes the trace id of an internal error', () => {
+    const message = describeProblem(problem({ status: 500, code: 'INTERNAL_ERROR', traceId: 'trace-42' }));
+    expect(message, 'the message').toEqual({ key: 'vulpes.problem.internal', params: ['trace-42'] });
   });
 
-  it('explains the 8 MB limit for a 413 without a code', () => {
-    const message = describeProblem(problem({ status: 413 }));
-    expect(message.text).toContain('8 MB');
+  it('names the 8 MB limit for a 413 without a code', () => {
+    expect(describeProblem(problem({ status: 413 })).key).toBe('vulpes.problem.too_large');
   });
 
   it('asks for a sign-in on 401 without a code', () => {
-    expect(describeProblem(problem({ status: 401 })).text).toContain('Sign in again');
+    expect(describeProblem(problem({ status: 401 })).key).toBe('vulpes.problem.sign_in');
   });
 
-  it('shows the HTTP status and the title for an unknown code', () => {
+  it('passes the HTTP status and the title for an unknown code', () => {
     const message = describeProblem(problem({ status: 418, title: 'I am a teapot' }));
-    expect(message.text).toContain('HTTP 418');
-    expect(message.text).toContain('I am a teapot');
+    expect(message, 'the message').toEqual({ key: 'vulpes.problem.http_title', params: ['418', 'I am a teapot'] });
   });
 
-  it('shows only the HTTP status when the body had no title or detail', () => {
-    expect(describeProblem(problem({ status: 502 })).text).toBe('Vulpes answered HTTP 502.');
+  it('passes only the HTTP status when the body had no title or detail', () => {
+    expect(describeProblem(problem({ status: 502 })), 'the message').toEqual({ key: 'vulpes.problem.http_status', params: ['502'] });
   });
 });
 
 describe('describeFailure', () => {
-  it('says that Vulpes cannot be reached and that local work is kept', () => {
+  it('passes the reason when Vulpes cannot be reached', () => {
     const message = describeFailure({ kind: 'unreachable', message: 'Failed to fetch' });
-    expect(message.text).toContain('cannot be reached');
-    expect(message.text).toContain('Local work is kept');
+    expect(message, 'the message').toEqual({ key: 'vulpes.problem.unreachable', params: ['Failed to fetch'] });
   });
 
-  it('says that the response was not understood, with its status', () => {
+  it('passes the status of a response the plugin cannot read', () => {
     const message = describeFailure({ kind: 'unexpected', status: 200 });
-    expect(message.text).toContain('HTTP 200');
+    expect(message, 'the message').toEqual({ key: 'vulpes.problem.unexpected', params: ['200'] });
   });
 
   it('delegates a problem response to describeProblem', () => {
     const message = describeFailure({ kind: 'problem', problem: problem({ status: 404, code: 'PROJECT_NOT_FOUND' }) });
-    expect(message.text).toContain('no longer exists');
+    expect(message.key).toBe('vulpes.problem.project_not_found');
   });
-});
 
-describe('describeFailure for a refused request', () => {
-  it('explains that nothing was sent and that the model must be opened again', () => {
-    const message = describeFailure({ kind: 'refused' });
-    expect(message.text).toContain('Nothing was sent');
-    expect(message.text).toContain('Open it from Vulpes again');
+  it('names the refusal of a request without a version tag', () => {
+    expect(describeFailure({ kind: 'refused' })).toEqual({ key: 'vulpes.problem.refused', params: [] });
   });
 });
