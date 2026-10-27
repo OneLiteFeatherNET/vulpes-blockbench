@@ -28,12 +28,6 @@ export function registerVulpesCodec(): () => void {
         writeLinked(project, content, path);
       }
     },
-    afterSave: () => {
-      const project = Project;
-      if (project !== null && project !== undefined) {
-        project.saved = true;
-      }
-    },
   });
   return () => {
     codec.delete();

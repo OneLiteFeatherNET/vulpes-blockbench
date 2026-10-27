@@ -94,7 +94,7 @@ interface CodecOptions {
   extension: string;
   compile: () => string;
   write: (content: string, path: string) => void;
-  afterSave: (path: string) => void;
+  afterSave?: (path: string) => void;
 }
 
 declare class Codec {
