@@ -2,7 +2,7 @@
 
 Ships as `feat(model): open and save models from vulpes`.
 
-Depends on `add-build-toolchain`, which provides the strict TypeScript build, and on two backend changes in Vulpes-Backend: the existing project asset API from draft PR #238 (the asset endpoints this change calls), and `add-asset-replace-precondition`, which adds the opt-in `If-Match` on content replacement.
+Depends on `add-build-toolchain`, which provides the strict TypeScript build, and on two backend changes in Vulpes-Backend: `add-project-assets` (the project asset API this change calls), and `add-asset-replace-precondition`, which adds the opt-in `If-Match` on content replacement.
 
 It does not depend on `add-device-login`. Requests carry a bearer token only when a token provider is configured, so the first version works against a local backend without sign-in. Sign-in arrives later with the shared backend auth change (see `add-device-login`, deferred).
 
