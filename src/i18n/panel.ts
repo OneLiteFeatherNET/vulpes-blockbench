@@ -1,0 +1,46 @@
+// The texts of the "Vulpes" sidebar panel. Blockbench's tl() looks them up by key and
+// falls back to the key itself. The plugin registers both tables with Language.addTranslations.
+// Placeholders %0 and %1 are filled by tl(key, [args]).
+
+export const panelTranslations: { en: Record<string, string>; de: Record<string, string> } = {
+  en: {
+    'vulpes.panel.title': 'Vulpes',
+    'vulpes.panel.environment': 'Environment',
+    'vulpes.panel.dev': 'Dev',
+    'vulpes.panel.prod': 'Prod',
+    'vulpes.panel.not_configured': 'Not configured',
+    'vulpes.panel.test_connection': 'Test connection',
+    'vulpes.panel.project': 'Project',
+    'vulpes.panel.choose_project': 'Choose a project',
+    'vulpes.panel.search': 'Search key or file name',
+    'vulpes.panel.open': 'Open',
+    'vulpes.panel.load_more': 'Load more',
+    'vulpes.panel.refresh': 'Refresh',
+    'vulpes.panel.save_new': 'Save to Vulpes',
+    'vulpes.panel.linked_to': 'Linked to %0 in %1',
+    'vulpes.panel.not_linked': 'Not linked',
+    'vulpes.panel.loading': 'Loading...',
+    'vulpes.panel.empty': 'No models',
+    'vulpes.panel.error': 'Error: %0',
+  },
+  de: {
+    'vulpes.panel.title': 'Vulpes',
+    'vulpes.panel.environment': 'Umgebung',
+    'vulpes.panel.dev': 'Dev',
+    'vulpes.panel.prod': 'Prod',
+    'vulpes.panel.not_configured': 'Nicht konfiguriert',
+    'vulpes.panel.test_connection': 'Verbindung testen',
+    'vulpes.panel.project': 'Projekt',
+    'vulpes.panel.choose_project': 'Projekt wählen',
+    'vulpes.panel.search': 'Schlüssel oder Dateiname suchen',
+    'vulpes.panel.open': 'Öffnen',
+    'vulpes.panel.load_more': 'Mehr laden',
+    'vulpes.panel.refresh': 'Aktualisieren',
+    'vulpes.panel.save_new': 'In Vulpes speichern',
+    'vulpes.panel.linked_to': 'Verknüpft mit %0 in %1',
+    'vulpes.panel.not_linked': 'Nicht verknüpft',
+    'vulpes.panel.loading': 'Lädt...',
+    'vulpes.panel.empty': 'Keine Modelle',
+    'vulpes.panel.error': 'Fehler: %0',
+  },
+};

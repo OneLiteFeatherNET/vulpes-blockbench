@@ -16,10 +16,12 @@ export interface MultipartBody {
 }
 
 export interface HttpRequest {
-  readonly method: 'GET' | 'POST';
+  readonly method: 'GET' | 'POST' | 'PUT';
   readonly url: string;
   readonly headers: Readonly<Record<string, string>>;
   readonly body?: MultipartBody;
+  /** A JSON text body, sent as it is. The caller sets its `Content-Type` header. */
+  readonly json?: string;
 }
 
 export interface HttpHeaderReader {

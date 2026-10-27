@@ -35,8 +35,9 @@ async function replaceWith(
   reference: RemoteReference,
   ifMatch: string,
   text: string,
+  comment: string | undefined,
 ): Promise<SaveOutcome> {
-  const result = await client.replaceModel(reference.projectId, reference.assetId, ifMatch, reference.key, text);
+  const result = await client.replaceModel(reference.projectId, reference.assetId, ifMatch, reference.key, text, comment);
   if (result.ok) {
     return { kind: 'saved', reference: { ...reference, etag: result.value.etag } };
   }
@@ -48,8 +49,8 @@ async function replaceWith(
 }
 
 /** Ctrl+S on a linked project: replaces the asset with the ETag the plugin last saw. */
-export function saveLinked(client: VulpesClient, reference: RemoteReference, text: string): Promise<SaveOutcome> {
-  return replaceWith(client, reference, reference.etag, text);
+export function saveLinked(client: VulpesClient, reference: RemoteReference, text: string, comment?: string): Promise<SaveOutcome> {
+  return replaceWith(client, reference, reference.etag, text, comment);
 }
 
 /** Overwrite from the conflict dialog: the ETag of the 412 response, without a GET first. */
@@ -58,8 +59,9 @@ export function overwriteLinked(
   reference: RemoteReference,
   text: string,
   currentEtag: string,
+  comment?: string,
 ): Promise<SaveOutcome> {
-  return replaceWith(client, reference, currentEtag, text);
+  return replaceWith(client, reference, currentEtag, text, comment);
 }
 
 /** Load latest from the conflict dialog: reads the current content and its ETag. */

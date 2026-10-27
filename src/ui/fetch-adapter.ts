@@ -22,6 +22,7 @@ export const rendererFetch: FetchLike = async (request: HttpRequest) => {
     method: request.method,
     headers: { ...request.headers },
     ...(request.body === undefined ? {} : { body: formDataOf(request.body) }),
+    ...(request.json === undefined ? {} : { body: request.json }),
   });
   return {
     status: response.status,
