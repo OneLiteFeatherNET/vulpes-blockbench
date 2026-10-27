@@ -1,20 +1,20 @@
-// "Save to Vulpes" for a model that is not linked yet: pick a project, enter a key,
-// create the asset. A model that is already linked saves with Ctrl+S instead.
+// "Save to Vulpes..." for a model that is not linked yet: pick a project, enter a key,
+// create the asset. A linked model saves with Ctrl+S instead.
 
 import type { ProjectSummary } from '../api/dto';
 import type { EnvironmentService } from '../environment/service';
-import type { UserMessage } from '../problem';
-import { describeFailure } from '../problem';
-import { listAllProjects } from '../remote/catalog';
 import { normalizeKey } from '../remote/key';
 import { createLinked } from '../remote/save';
-import { notify } from './notify';
-import { linkOf, setLink } from './project-link';
-import { clientFor, configuredBaseUrl, fieldText, messageText, runAction } from './remote-context';
+import { describeFailure, type UserMessage } from '../problem';
+import { listAllProjects } from '../remote/catalog';
+import { emitVulpesChange } from './change-bus';
+import { errorMessage, quickMessage } from './feedback';
+import { attachLink, linkOf } from './project-link';
+import { clientFor, environmentName, fieldText, messageText, notConfigured, originOf, runAction, type Origin } from './remote-context';
 
 interface NewModelContext {
   readonly project: BlockbenchProject;
-  readonly baseUrl: string;
+  readonly origin: Origin;
   readonly projects: readonly ProjectSummary[];
 }
 
@@ -27,27 +27,28 @@ interface NewModelState {
 export async function startSaveNewToVulpes(service: EnvironmentService): Promise<void> {
   const project = Project;
   if (project === null || project === undefined) {
-    notify('Open or create a model first.');
+    errorMessage(tl('vulpes.save_new.no_model'));
     return;
   }
   if (linkOf(project) !== undefined) {
-    notify('This model is already linked to Vulpes. Use Ctrl+S to save it.');
+    errorMessage(tl('vulpes.save_new.already_linked'));
     return;
   }
-  const baseUrl = configuredBaseUrl(service);
-  if (baseUrl === undefined) {
+  const origin = originOf(service);
+  if (origin === undefined) {
+    errorMessage(messageText(notConfigured(service)));
     return;
   }
-  const result = await listAllProjects(clientFor(baseUrl));
+  const result = await listAllProjects(clientFor(origin.baseUrl));
   if (!result.ok) {
-    notify(messageText(describeFailure(result.failure)));
+    errorMessage(messageText(describeFailure(result.failure)));
     return;
   }
   if (result.value.length === 0) {
-    notify('Create a project in Vulpes first.');
+    errorMessage(tl('vulpes.save_new.no_projects'));
     return;
   }
-  newModelDialog({ project, baseUrl, projects: result.value }, { key: '' });
+  newModelDialog({ project, origin, projects: result.value }, { key: '' });
 }
 
 function newModelDialog(context: NewModelContext, state: NewModelState): void {
@@ -62,13 +63,13 @@ function newModelDialog(context: NewModelContext, state: NewModelState): void {
   const keyError = state.error?.field === 'key' ? messageText(state.error) : undefined;
   const otherError = state.error !== undefined && keyError === undefined ? messageText(state.error) : undefined;
   const dialog: Dialog = new Dialog('vulpes_save_new', {
-    title: 'Save to Vulpes as a new model',
-    lines: otherError === undefined ? ['Keys look like vulpes:item/ruby.'] : [otherError],
+    title: 'vulpes.save_new.title',
+    lines: [otherError ?? tl('vulpes.save_new.hint')],
     form: {
-      project: { label: 'Project', type: 'select', options, value: state.projectId ?? first.id },
-      key: { label: keyError === undefined ? 'Key' : `Key: ${keyError}`, type: 'text', value: state.key },
+      project: { label: tl('vulpes.field.project'), type: 'select', options, value: state.projectId ?? first.id },
+      key: { label: keyError === undefined ? tl('vulpes.field.key') : tl('vulpes.field.key_error', [keyError]), type: 'text', value: state.key },
     },
-    buttons: ['Save to Vulpes', 'Cancel'],
+    buttons: ['vulpes.save_new.button', 'dialog.cancel'],
     confirmIndex: 0,
     cancelIndex: 1,
     onConfirm(result) {
@@ -78,7 +79,7 @@ function newModelDialog(context: NewModelContext, state: NewModelState): void {
         return false;
       }
       if (!check.ok) {
-        notify('Enter a key first, for example vulpes:item/ruby.');
+        errorMessage(tl('vulpes.save_new.key_required'));
         return false;
       }
       dialog.hide();
@@ -91,16 +92,17 @@ function newModelDialog(context: NewModelContext, state: NewModelState): void {
 
 async function createNewModel(context: NewModelContext, projectId: string, key: string): Promise<void> {
   if (Project !== context.project) {
-    notify('Switch back to the model you want to save, then try again.');
+    errorMessage(tl('vulpes.save_new.switch_back'));
     return;
   }
   const text = Codecs.project.compile();
-  const outcome = await createLinked(clientFor(context.baseUrl), { baseUrl: context.baseUrl, projectId }, key, text);
+  const outcome = await createLinked(clientFor(context.origin.baseUrl), { baseUrl: context.origin.baseUrl, projectId }, key, text);
   if (outcome.kind === 'failed') {
     newModelDialog(context, { projectId, key, error: outcome.message });
     return;
   }
-  setLink(context.project, outcome.reference);
+  attachLink(context.project, { ...outcome.reference, environment: context.origin.environment });
   context.project.saved = true;
-  notify(`Saved to Vulpes as ${key}.`);
+  emitVulpesChange();
+  quickMessage(tl('vulpes.saved_new', [key, environmentName(context.origin.environment)]));
 }

@@ -1,44 +1,61 @@
-// "Open from Vulpes": project dialog, then a paged model dialog. The model opens as
-// a normal Blockbench project that carries its remote reference.
+// "Open from Vulpes": a project dialog, then a paged model dialog. A model opens as a
+// normal Blockbench project that is linked to the asset it came from.
 
 import type { AssetSummary, ProjectSummary } from '../api/dto';
 import type { EnvironmentService } from '../environment/service';
 import { isRecord, parseJsonText } from '../json';
-import { formatIdOf } from '../model/format';
-import { describeFailure } from '../problem';
+import type { LinkRecord } from '../link/link-state';
+import { describeFailure, type UserMessage } from '../problem';
 import { listAllProjects, loadNextModelPage } from '../remote/catalog';
 import { emptyModelList, hasMoreModels, type ModelList } from '../remote/model-list';
-import type { RemoteReference } from '../remote/reference';
-import { notify } from './notify';
-import { setLink } from './project-link';
-import { clientFor, configuredBaseUrl, fieldText, messageText, runAction } from './remote-context';
-
-interface OpenSession {
-  readonly baseUrl: string;
-}
+import { errorMessage } from './feedback';
+import { placeModel } from './place-model';
+import { clientFor, environmentName, fieldText, messageText, notConfigured, originOf, runAction, type Origin } from './remote-context';
 
 export async function startOpenFromVulpes(service: EnvironmentService): Promise<void> {
-  const baseUrl = configuredBaseUrl(service);
-  if (baseUrl === undefined) {
+  const origin = originOf(service);
+  if (origin === undefined) {
+    errorMessage(messageText(notConfigured(service)));
     return;
   }
-  await showProjects({ baseUrl }, undefined);
+  await showProjects(origin, undefined);
 }
 
-async function showProjects(session: OpenSession, selected: string | undefined): Promise<void> {
-  const result = await listAllProjects(clientFor(session.baseUrl));
+/** Opens one asset as a project. Returns the message to show when it fails, or undefined on success. */
+export async function openAsset(origin: Origin, projectId: string, asset: AssetSummary): Promise<UserMessage | undefined> {
+  const result = await clientFor(origin.baseUrl).readModel(projectId, asset.id);
   if (!result.ok) {
-    notify(messageText(describeFailure(result.failure)));
+    return describeFailure(result.failure);
+  }
+  const model = parseJsonText(result.value.text);
+  if (!isRecord(model)) {
+    return { key: 'vulpes.open.not_model', params: [] };
+  }
+  const record: LinkRecord = {
+    environment: origin.environment,
+    baseUrl: origin.baseUrl,
+    projectId,
+    assetId: asset.id,
+    key: asset.key,
+    etag: result.value.etag,
+  };
+  return placeModel(model, record);
+}
+
+async function showProjects(origin: Origin, selected: string | undefined): Promise<void> {
+  const result = await listAllProjects(clientFor(origin.baseUrl));
+  if (!result.ok) {
+    errorMessage(messageText(describeFailure(result.failure)));
     return;
   }
   if (result.value.length === 0) {
-    notify('There are no projects in Vulpes.');
+    errorMessage(tl('vulpes.open.no_projects', [environmentName(origin.environment)]));
     return;
   }
-  projectDialog(session, result.value, selected);
+  projectDialog(origin, result.value, selected);
 }
 
-function projectDialog(session: OpenSession, projects: readonly ProjectSummary[], selected: string | undefined): void {
+function projectDialog(origin: Origin, projects: readonly ProjectSummary[], selected: string | undefined): void {
   const first = projects[0];
   if (first === undefined) {
     return;
@@ -48,9 +65,9 @@ function projectDialog(session: OpenSession, projects: readonly ProjectSummary[]
     options[project.id] = `${project.displayName} (${project.key})`;
   }
   const dialog: Dialog = new Dialog('vulpes_open_project', {
-    title: 'Open from Vulpes: choose a project',
-    form: { project: { label: 'Project', type: 'select', options, value: selected ?? first.id } },
-    buttons: ['Next', 'Cancel'],
+    title: 'vulpes.open.project_title',
+    form: { project: { label: tl('vulpes.field.project'), type: 'select', options, value: selected ?? first.id } },
+    buttons: ['vulpes.button.next', 'dialog.cancel'],
     confirmIndex: 0,
     cancelIndex: 1,
     onConfirm(result) {
@@ -59,20 +76,20 @@ function projectDialog(session: OpenSession, projects: readonly ProjectSummary[]
         return false;
       }
       dialog.hide();
-      runAction(() => startModels(session, chosen));
+      runAction(() => startModels(origin, chosen));
       return false;
     },
   });
   dialog.show();
 }
 
-async function startModels(session: OpenSession, project: ProjectSummary): Promise<void> {
-  const result = await loadNextModelPage(clientFor(session.baseUrl), project.id, emptyModelList());
+async function startModels(origin: Origin, project: ProjectSummary): Promise<void> {
+  const result = await loadNextModelPage(clientFor(origin.baseUrl), project.id, emptyModelList());
   if (!result.ok) {
-    modelDialog(session, project, emptyModelList(), { error: messageText(describeFailure(result.failure)) });
+    modelDialog(origin, project, emptyModelList(), { error: messageText(describeFailure(result.failure)) });
     return;
   }
-  modelDialog(session, project, result.value, {});
+  modelDialog(origin, project, result.value, {});
 }
 
 interface DialogState {
@@ -80,7 +97,7 @@ interface DialogState {
   readonly selected?: string;
 }
 
-function modelDialog(session: OpenSession, project: ProjectSummary, list: ModelList, state: DialogState): void {
+function modelDialog(origin: Origin, project: ProjectSummary, list: ModelList, state: DialogState): void {
   const first = list.items[0];
   const options: Record<string, string> = {};
   for (const asset of list.items) {
@@ -89,37 +106,46 @@ function modelDialog(session: OpenSession, project: ProjectSummary, list: ModelL
   const actions: ((selected: string | undefined) => void)[] = [];
   const buttons: string[] = [];
   if (first !== undefined) {
-    buttons.push('Open');
+    buttons.push('vulpes.button.open');
     actions.push((selected) => {
       const asset = list.items.find((item) => item.id === selected);
       if (asset !== undefined) {
-        runAction(() => openModel(session, project, list, asset));
+        runAction(async () => {
+          const message = await openAsset(origin, project.id, asset);
+          if (message !== undefined) {
+            modelDialog(origin, project, list, { error: messageText(message), selected: asset.id });
+          }
+        });
       }
     });
   }
   if (hasMoreModels(list)) {
-    buttons.push('Load more');
+    buttons.push('vulpes.button.load_more');
     actions.push((selected) => {
-      runAction(() => loadMore(session, project, list, selected));
+      runAction(() => loadMore(origin, project, list, selected));
     });
   }
-  buttons.push('Back');
+  buttons.push('vulpes.button.back');
   actions.push(() => {
-    runAction(() => showProjects(session, project.id));
+    runAction(() => showProjects(origin, project.id));
   });
   const cancelIndex = buttons.length;
-  buttons.push('Cancel');
+  buttons.push('dialog.cancel');
   actions.push(() => undefined);
 
-  const lines = state.error !== undefined
-    ? [state.error]
-    : [list.totalSize === 0 ? 'This project has no Blockbench models yet.' : `${project.displayName}: ${String(list.items.length)} of ${String(list.totalSize)} models.`];
-  const form: { form?: Record<string, FormField> } = first === undefined
-    ? {}
-    : { form: { model: { label: 'Model', type: 'select', options, value: state.selected ?? first.id } } };
+  const lines = [
+    state.error ??
+      (list.totalSize === 0
+        ? tl('vulpes.open.no_models')
+        : tl('vulpes.open.count', [project.displayName, String(list.items.length), String(list.totalSize)])),
+  ];
+  const form: { form?: Record<string, FormField> } =
+    first === undefined
+      ? {}
+      : { form: { model: { label: tl('vulpes.field.model'), type: 'select', options, value: state.selected ?? first.id } } };
 
   const dialog: Dialog = new Dialog('vulpes_open_model', {
-    title: `Open from Vulpes: ${project.displayName}`,
+    title: tl('vulpes.open.model_title', [project.displayName]),
     lines,
     ...form,
     buttons,
@@ -139,62 +165,15 @@ function modelDialog(session: OpenSession, project: ProjectSummary, list: ModelL
   dialog.show();
 }
 
-async function loadMore(session: OpenSession, project: ProjectSummary, list: ModelList, selected: string | undefined): Promise<void> {
-  const result = await loadNextModelPage(clientFor(session.baseUrl), project.id, list);
+async function loadMore(origin: Origin, project: ProjectSummary, list: ModelList, selected: string | undefined): Promise<void> {
+  const result = await loadNextModelPage(clientFor(origin.baseUrl), project.id, list);
   if (!result.ok) {
-    modelDialog(session, project, list, { error: messageText(describeFailure(result.failure)), ...optionalSelected(selected) });
+    modelDialog(origin, project, list, { error: messageText(describeFailure(result.failure)), ...optionalSelected(selected) });
     return;
   }
-  modelDialog(session, project, result.value, optionalSelected(selected));
+  modelDialog(origin, project, result.value, optionalSelected(selected));
 }
 
 function optionalSelected(selected: string | undefined): DialogState {
   return selected === undefined ? {} : { selected };
-}
-
-async function openModel(session: OpenSession, project: ProjectSummary, list: ModelList, asset: AssetSummary): Promise<void> {
-  const result = await clientFor(session.baseUrl).readModel(project.id, asset.id);
-  if (!result.ok) {
-    const { failure } = result;
-    if (failure.kind === 'problem' && failure.problem.code === 'PROJECT_NOT_FOUND') {
-      notify(messageText(describeFailure(failure)));
-      await showProjects(session, undefined);
-      return;
-    }
-    modelDialog(session, project, list, { error: messageText(describeFailure(failure)), selected: asset.id });
-    return;
-  }
-  const model = parseJsonText(result.value.text);
-  if (!isRecord(model)) {
-    modelDialog(session, project, list, { error: 'The model in Vulpes is not a Blockbench model.', selected: asset.id });
-    return;
-  }
-  const reference: RemoteReference = {
-    baseUrl: session.baseUrl,
-    projectId: project.id,
-    assetId: asset.id,
-    key: asset.key,
-    etag: result.value.etag,
-  };
-  placeProject(model, asset.fileName, reference);
-}
-
-/** Opens the model as a new project. Parse errors in Blockbench become a notice. */
-function placeProject(model: Record<string, unknown>, fileName: string, reference: RemoteReference): void {
-  try {
-    setupProject(formatIdOf(model));
-    Codecs.project.parse(model, '');
-  } catch (error: unknown) {
-    notify(`Blockbench could not open this model: ${error instanceof Error ? error.message : 'unknown error'}`);
-    return;
-  }
-  const opened = Project;
-  if (opened === null || opened === undefined) {
-    notify('Blockbench did not open the model.');
-    return;
-  }
-  opened.name = fileName.replace(/\.bbmodel$/u, '');
-  setLink(opened, reference);
-  opened.saved = true;
-  notify(`Opened ${reference.key} from Vulpes.`);
 }

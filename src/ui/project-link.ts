@@ -1,27 +1,48 @@
-// The remote reference of a project. It is a Property with export: false, so the
-// reference lives on the project in memory and is never part of the model JSON.
+// The Vulpes link of each open project. The export path names the asset; the base URL,
+// the key and the ETag are held here in memory, by project uuid. A restart drops them,
+// so a linked project refuses to save until it is opened from Vulpes again.
 
-import { isRemoteReference, type RemoteReference } from '../remote/reference';
+import { linkedRecord, type LinkRecord } from '../link/link-state';
+import { buildVulpesPath, parseVulpesPath } from '../link/vulpes-path';
 
-const PROPERTY_NAME = 'vulpes_remote';
+export const VULPES_CODEC = 'vulpes';
 
-let property: Property | undefined;
+const records = new Map<string, LinkRecord>();
 
-export function registerLinkProperty(): void {
-  property = new Property(ModelProject, 'object', PROPERTY_NAME, { export: false });
+/** Links a project: the export codec, the export path and the record. A linked project has no local save path. */
+export function attachLink(project: BlockbenchProject, record: LinkRecord): void {
+  records.set(project.uuid, record);
+  project.export_codec = VULPES_CODEC;
+  project.export_path = buildVulpesPath(record);
+  project.save_path = '';
 }
 
-export function unregisterLinkProperty(): void {
-  property?.delete();
-  property = undefined;
+/** Removes the link. The project keeps its content and becomes a local project. */
+export function detachLink(project: BlockbenchProject): void {
+  records.delete(project.uuid);
+  if (project.export_codec === VULPES_CODEC) {
+    project.export_codec = '';
+    project.export_path = '';
+  }
 }
 
-/** The reference of a project, or undefined when the project is not linked. */
-export function linkOf(project: BlockbenchProject): RemoteReference | undefined {
-  const stored: unknown = project.vulpes_remote;
-  return isRemoteReference(stored) ? stored : undefined;
+/** The record held for the project. It is returned even when the project no longer points to it. */
+export function heldRecord(project: BlockbenchProject): LinkRecord | undefined {
+  return records.get(project.uuid);
 }
 
-export function setLink(project: BlockbenchProject, reference: RemoteReference): void {
-  project.vulpes_remote = reference;
+/** The link as the designer sees it. A local save ends the link, so it reads as not linked. */
+export function linkOf(project: BlockbenchProject): LinkRecord | undefined {
+  if (project.export_codec !== VULPES_CODEC || project.save_path !== '') {
+    return undefined;
+  }
+  return linkedRecord(parseVulpesPath(project.export_path), records.get(project.uuid));
+}
+
+/** Clears the link of every open project, so no vulpes:// path is left for a codec that is gone. */
+export function detachAll(): void {
+  for (const project of ModelProject.all) {
+    detachLink(project);
+  }
+  records.clear();
 }

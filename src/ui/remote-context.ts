@@ -1,45 +1,35 @@
-// Shared helpers of the remote dialogs: clients for an origin, the configured
-// base URL of the active environment, and the notice that names the save target.
+// Shared helpers of the Vulpes flows: the client for an origin, the origin of the active
+// environment, the designer-facing text of a message, and the guard around each action.
 
 import { createVulpesClient, type VulpesClient } from '../api/client';
-import { PROFILE_IDS, type EnvironmentProfile } from '../environment/profiles';
-import { resolveSaveTarget } from '../environment/resolve-save-target';
+import type { ProfileId } from '../environment/profiles';
 import type { EnvironmentService } from '../environment/service';
-import type { RemoteReference } from '../remote/reference';
 import type { UserMessage } from '../problem';
+import { errorMessage } from './feedback';
 import { rendererFetch } from './fetch-adapter';
-import { notify } from './notify';
 
-/** Returns the service of the current Blockbench session. Each call reads the stored values again. */
-export type ServiceProvider = () => EnvironmentService;
+/** Where a flow sends its requests: the base URL and the environment it belongs to. */
+export interface Origin {
+  readonly baseUrl: string;
+  readonly environment: ProfileId;
+}
 
 export function clientFor(baseUrl: string): VulpesClient {
   return createVulpesClient({ baseUrl, fetch: rendererFetch });
 }
 
-export function profilesOf(service: EnvironmentService): readonly EnvironmentProfile[] {
-  const snapshot = service.snapshot();
-  return PROFILE_IDS.map((id) => ({ id, baseUrl: snapshot.baseUrls[id] }));
+export function environmentName(id: ProfileId): string {
+  return tl(id === 'prod' ? 'vulpes.env.prod' : 'vulpes.env.dev');
 }
 
-/** The base URL of the active environment, or undefined after a notice that it is not configured. */
-export function configuredBaseUrl(service: EnvironmentService): string | undefined {
+/** The origin of the active environment, or undefined when its URL is missing or invalid. */
+export function originOf(service: EnvironmentService): Origin | undefined {
   const configured = service.configuredActiveProfile();
-  if (configured.ok) {
-    return configured.baseUrl;
-  }
-  const name = service.activeProfile().id === 'prod' ? 'Prod' : 'Dev';
-  notify(`${name} is not configured. Enter its URL in the Vulpes settings first.`);
-  return undefined;
+  return configured.ok ? { baseUrl: configured.baseUrl, environment: service.activeProfile().id } : undefined;
 }
 
-/** The success notice of a save. It names the origin, and says so when that is not the active environment. */
-export function savedNotice(service: EnvironmentService, reference: RemoteReference): string {
-  const target = resolveSaveTarget(reference, service.activeProfile(), profilesOf(service));
-  const where = target.targetName ?? target.baseUrl;
-  return target.isActive
-    ? `Saved to Vulpes (${where}).`
-    : `Saved to Vulpes (${where}), which is not the active environment (${service.activeProfile().id}).`;
+export function notConfigured(service: EnvironmentService): UserMessage {
+  return { key: 'vulpes.not_configured', params: [environmentName(service.activeProfile().id)] };
 }
 
 /** The designer-facing text of a message, translated by Blockbench. */
@@ -53,9 +43,9 @@ export function fieldText(result: Record<string, unknown>, name: string): string
   return typeof value === 'string' ? value : undefined;
 }
 
-/** Runs one user action. An unexpected failure becomes a notice instead of an unhandled rejection. */
+/** Runs one designer action. An unexpected failure becomes a message box instead of an unhandled rejection. */
 export function runAction(task: () => Promise<void>): void {
   task().catch((error: unknown) => {
-    notify(`Unexpected error: ${error instanceof Error ? error.message : 'unknown error'}`);
+    errorMessage(tl('vulpes.unexpected', [error instanceof Error ? error.message : 'unknown error']));
   });
 }
