@@ -146,3 +146,6 @@ declare const Codecs: {
 
 /** Creates a project in the given format id, or in free when the id is unknown, and selects it. */
 declare function setupProject(format: string): boolean;
+
+/** Translates a key of the language tables. Parameters replace %0, %1 ... in the text. */
+declare function tl(key: string, variables?: string | number | (string | number)[], defaultValue?: string): string;

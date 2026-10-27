@@ -10,7 +10,7 @@ import { normalizeKey } from '../remote/key';
 import { createLinked } from '../remote/save';
 import { notify } from './notify';
 import { linkOf, setLink } from './project-link';
-import { clientFor, configuredBaseUrl, fieldText, runAction } from './remote-context';
+import { clientFor, configuredBaseUrl, fieldText, messageText, runAction } from './remote-context';
 
 interface NewModelContext {
   readonly project: BlockbenchProject;
@@ -40,7 +40,7 @@ export async function startSaveNewToVulpes(service: EnvironmentService): Promise
   }
   const result = await listAllProjects(clientFor(baseUrl));
   if (!result.ok) {
-    notify(describeFailure(result.failure).text);
+    notify(messageText(describeFailure(result.failure)));
     return;
   }
   if (result.value.length === 0) {
@@ -59,8 +59,8 @@ function newModelDialog(context: NewModelContext, state: NewModelState): void {
   for (const project of context.projects) {
     options[project.id] = `${project.displayName} (${project.key})`;
   }
-  const keyError = state.error?.field === 'key' ? state.error.text : undefined;
-  const otherError = state.error !== undefined && keyError === undefined ? state.error.text : undefined;
+  const keyError = state.error?.field === 'key' ? messageText(state.error) : undefined;
+  const otherError = state.error !== undefined && keyError === undefined ? messageText(state.error) : undefined;
   const dialog: Dialog = new Dialog('vulpes_save_new', {
     title: 'Save to Vulpes as a new model',
     lines: otherError === undefined ? ['Keys look like vulpes:item/ruby.'] : [otherError],

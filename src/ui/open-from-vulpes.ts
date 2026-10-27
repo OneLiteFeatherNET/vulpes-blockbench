@@ -11,7 +11,7 @@ import { emptyModelList, hasMoreModels, type ModelList } from '../remote/model-l
 import type { RemoteReference } from '../remote/reference';
 import { notify } from './notify';
 import { setLink } from './project-link';
-import { clientFor, configuredBaseUrl, fieldText, runAction } from './remote-context';
+import { clientFor, configuredBaseUrl, fieldText, messageText, runAction } from './remote-context';
 
 interface OpenSession {
   readonly baseUrl: string;
@@ -28,7 +28,7 @@ export async function startOpenFromVulpes(service: EnvironmentService): Promise<
 async function showProjects(session: OpenSession, selected: string | undefined): Promise<void> {
   const result = await listAllProjects(clientFor(session.baseUrl));
   if (!result.ok) {
-    notify(describeFailure(result.failure).text);
+    notify(messageText(describeFailure(result.failure)));
     return;
   }
   if (result.value.length === 0) {
@@ -69,7 +69,7 @@ function projectDialog(session: OpenSession, projects: readonly ProjectSummary[]
 async function startModels(session: OpenSession, project: ProjectSummary): Promise<void> {
   const result = await loadNextModelPage(clientFor(session.baseUrl), project.id, emptyModelList());
   if (!result.ok) {
-    modelDialog(session, project, emptyModelList(), { error: describeFailure(result.failure).text });
+    modelDialog(session, project, emptyModelList(), { error: messageText(describeFailure(result.failure)) });
     return;
   }
   modelDialog(session, project, result.value, {});
@@ -142,7 +142,7 @@ function modelDialog(session: OpenSession, project: ProjectSummary, list: ModelL
 async function loadMore(session: OpenSession, project: ProjectSummary, list: ModelList, selected: string | undefined): Promise<void> {
   const result = await loadNextModelPage(clientFor(session.baseUrl), project.id, list);
   if (!result.ok) {
-    modelDialog(session, project, list, { error: describeFailure(result.failure).text, ...optionalSelected(selected) });
+    modelDialog(session, project, list, { error: messageText(describeFailure(result.failure)), ...optionalSelected(selected) });
     return;
   }
   modelDialog(session, project, result.value, optionalSelected(selected));
@@ -157,11 +157,11 @@ async function openModel(session: OpenSession, project: ProjectSummary, list: Mo
   if (!result.ok) {
     const { failure } = result;
     if (failure.kind === 'problem' && failure.problem.code === 'PROJECT_NOT_FOUND') {
-      notify(describeFailure(failure).text);
+      notify(messageText(describeFailure(failure)));
       await showProjects(session, undefined);
       return;
     }
-    modelDialog(session, project, list, { error: describeFailure(failure).text, selected: asset.id });
+    modelDialog(session, project, list, { error: messageText(describeFailure(failure)), selected: asset.id });
     return;
   }
   const model = parseJsonText(result.value.text);

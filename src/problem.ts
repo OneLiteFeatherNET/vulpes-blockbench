@@ -49,9 +49,13 @@ export type ApiFailure =
   /** The request was not sent, because a replacement needs a valid ETag. */
   | { readonly kind: 'refused' };
 
-/** A message for the designer. `field` names the input the message belongs to. */
+/**
+ * A message for the designer: a key of the translation table, its parameters, and the
+ * input it belongs to. The glue passes it through `tl()`, so no English text lives here.
+ */
 export interface UserMessage {
-  readonly text: string;
+  readonly key: string;
+  readonly params: readonly string[];
   readonly field?: 'key' | 'file';
 }
 
@@ -111,36 +115,36 @@ function firstViolation(problem: VulpesProblem, field: string): Violation | unde
 export function describeProblem(problem: VulpesProblem): UserMessage {
   switch (problem.code) {
     case 'PROJECT_NOT_FOUND':
-      return { text: 'The project no longer exists in Vulpes. Pick another project.' };
+      return { key: 'vulpes.problem.project_not_found', params: [] };
     case 'RESOURCE_NOT_FOUND':
-      return { text: 'The model was deleted in Vulpes. Use "Save as copy" to keep your work.' };
+      return { key: 'vulpes.problem.model_deleted', params: [] };
     case 'VALIDATION_FAILED': {
       const key = firstViolation(problem, 'key');
       if (key !== undefined) {
-        return { text: key.message, field: 'key' };
+        return { key: 'vulpes.problem.violation', params: [key.message], field: 'key' };
       }
       const file = firstViolation(problem, 'file');
       if (file !== undefined) {
-        return { text: `Vulpes rejected the model file: ${file.message}`, field: 'file' };
+        return { key: 'vulpes.problem.file_rejected', params: [file.message], field: 'file' };
       }
       const first = problem.violations[0];
-      return { text: first === undefined ? 'Vulpes rejected the request.' : `Vulpes rejected the request: ${first.message}` };
+      return first === undefined
+        ? { key: 'vulpes.problem.validation', params: [] }
+        : { key: 'vulpes.problem.validation_detail', params: [first.message] };
     }
     case 'RESOURCE_CONFLICT':
-      return {
-        text: 'A model or texture with this key already exists. Choose another key. If an earlier save may have succeeded, open the model from Vulpes instead.',
-        field: 'key',
-      };
+      return { key: 'vulpes.problem.key_conflict', params: [], field: 'key' };
     case 'ASSET_PRECONDITION_FAILED':
-      return { text: 'The model changed in Vulpes since it was opened.' };
+      return { key: 'vulpes.problem.changed', params: [] };
     case 'INVALID_REQUEST':
     case 'METHOD_NOT_ALLOWED':
     case 'UNSUPPORTED_MEDIA_TYPE':
       return {
-        text: `This is a plugin bug (HTTP ${String(problem.status)}): ${problem.detail ?? problem.title ?? 'no detail given'}`,
+        key: 'vulpes.problem.plugin_bug',
+        params: [String(problem.status), problem.detail ?? problem.title ?? ''],
       };
     case 'INTERNAL_ERROR':
-      return { text: `Vulpes failed on its side. Trace ID: ${problem.traceId ?? 'none'}.` };
+      return { key: 'vulpes.problem.internal', params: [problem.traceId ?? 'none'] };
     case undefined:
       return describeWithoutCode(problem);
   }
@@ -148,25 +152,27 @@ export function describeProblem(problem: VulpesProblem): UserMessage {
 
 function describeWithoutCode(problem: VulpesProblem): UserMessage {
   if (problem.status === 413) {
-    return { text: 'The model is larger than 8 MB. Reduce the embedded textures.' };
+    return { key: 'vulpes.problem.too_large', params: [] };
   }
   if (problem.status === 401) {
-    return { text: 'Sign in again.' };
+    return { key: 'vulpes.problem.sign_in', params: [] };
   }
   const label = problem.title ?? problem.detail;
-  return { text: label === undefined ? `Vulpes answered HTTP ${String(problem.status)}.` : `Vulpes answered HTTP ${String(problem.status)}: ${label}` };
+  return label === undefined
+    ? { key: 'vulpes.problem.http_status', params: [String(problem.status)] }
+    : { key: 'vulpes.problem.http_title', params: [String(problem.status), label] };
 }
 
 /** The message for a request that produced no problem body: no response, or a response the plugin cannot read. */
 export function describeFailure(failure: ApiFailure): UserMessage {
   switch (failure.kind) {
     case 'unreachable':
-      return { text: `Vulpes cannot be reached (${failure.message}). Local work is kept.` };
+      return { key: 'vulpes.problem.unreachable', params: [failure.message] };
     case 'problem':
       return describeProblem(failure.problem);
     case 'unexpected':
-      return { text: `Vulpes sent a response this plugin cannot read (HTTP ${String(failure.status)}).` };
+      return { key: 'vulpes.problem.unexpected', params: [String(failure.status)] };
     case 'refused':
-      return { text: 'Nothing was sent: this model has no version tag from Vulpes. Open it from Vulpes again.' };
+      return { key: 'vulpes.problem.refused', params: [] };
   }
 }

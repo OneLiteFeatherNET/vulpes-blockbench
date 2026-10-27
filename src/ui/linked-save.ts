@@ -9,7 +9,7 @@ import type { RemoteReference } from '../remote/reference';
 import { createLinked, loadLatest, overwriteLinked, saveLinked, type SaveOutcome } from '../remote/save';
 import { notify } from './notify';
 import { setLink } from './project-link';
-import { clientFor, fieldText, runAction, savedNotice } from './remote-context';
+import { clientFor, fieldText, messageText, runAction, savedNotice } from './remote-context';
 
 /** Saves the linked project to the origin of its reference, never to the active environment. */
 export function saveLinkedProject(service: EnvironmentService, project: BlockbenchProject, reference: RemoteReference): void {
@@ -37,7 +37,7 @@ function applyOutcome(
       openConflictDialog(service, project, text, reference, outcome.currentEtag);
       return;
     case 'failed':
-      notify(outcome.message.text);
+      notify(messageText(outcome.message));
       return;
   }
 }
@@ -123,7 +123,7 @@ function confirmLoadLatest(project: BlockbenchProject, reference: RemoteReferenc
 async function loadLatestInto(project: BlockbenchProject, reference: RemoteReference): Promise<void> {
   const outcome = await loadLatest(clientFor(reference.baseUrl), reference);
   if (outcome.kind === 'failed') {
-    notify(outcome.message.text);
+    notify(messageText(outcome.message));
     return;
   }
   const model = parseJsonText(outcome.text);
@@ -159,8 +159,8 @@ function askCopyKey(
   prefill: string,
   error: UserMessage | undefined,
 ): void {
-  const keyError = error?.field === 'key' ? error.text : undefined;
-  const otherError = error !== undefined && keyError === undefined ? error.text : undefined;
+  const keyError = error?.field === 'key' ? messageText(error) : undefined;
+  const otherError = error !== undefined && keyError === undefined ? messageText(error) : undefined;
   const dialog: Dialog = new Dialog('vulpes_save_copy', {
     title: 'Save as copy in Vulpes',
     lines: otherError === undefined ? ['The original model in Vulpes stays as it is.'] : [otherError],

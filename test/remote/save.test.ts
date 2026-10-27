@@ -53,7 +53,7 @@ describe('saveLinked', () => {
     const outcome = await saveLinked(createVulpesClient({ baseUrl: BASE, fetch: recorder.fetch }), REFERENCE, TEXT);
     expect(outcome.kind, 'the kind').toBe('failed');
     if (outcome.kind === 'failed') {
-      expect(outcome.message.text, 'the message').toContain('Local work is kept');
+      expect(outcome.message.key, 'the message').toBe('vulpes.problem.unreachable');
     }
   });
 
@@ -68,7 +68,7 @@ describe('saveLinked', () => {
     const body = JSON.stringify({ title: 'Resource not found', status: 404, code: 'RESOURCE_NOT_FOUND' });
     const recorder = fakeFetch(() => ({ status: 404, body }));
     const outcome = await saveLinked(clientFor(recorder), REFERENCE, TEXT);
-    expect(outcome.kind === 'failed' && outcome.message.text.includes('Save as copy'), 'the message').toBe(true);
+    expect(outcome.kind === 'failed' && outcome.message.key === 'vulpes.problem.model_deleted', 'the message').toBe(true);
   });
 });
 

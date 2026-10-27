@@ -6,6 +6,7 @@ import { PROFILE_IDS, type EnvironmentProfile } from '../environment/profiles';
 import { resolveSaveTarget } from '../environment/resolve-save-target';
 import type { EnvironmentService } from '../environment/service';
 import type { RemoteReference } from '../remote/reference';
+import type { UserMessage } from '../problem';
 import { rendererFetch } from './fetch-adapter';
 import { notify } from './notify';
 
@@ -39,6 +40,11 @@ export function savedNotice(service: EnvironmentService, reference: RemoteRefere
   return target.isActive
     ? `Saved to Vulpes (${where}).`
     : `Saved to Vulpes (${where}), which is not the active environment (${service.activeProfile().id}).`;
+}
+
+/** The designer-facing text of a message, translated by Blockbench. */
+export function messageText(message: UserMessage): string {
+  return tl(message.key, [...message.params]);
 }
 
 /** Reads a text field of a dialog result. Blockbench returns untrusted values, so anything else is undefined. */
