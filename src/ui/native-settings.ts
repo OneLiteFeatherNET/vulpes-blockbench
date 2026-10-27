@@ -11,7 +11,13 @@ export function registerNativeSettings(
   onActiveChanged: () => void,
   onUrlChanged: () => void,
 ): void {
-  Settings.addCategory(SETTINGS_CATEGORY, { name: 'Vulpes' });
+  try {
+    Settings.addCategory(SETTINGS_CATEGORY, { name: 'Vulpes' });
+  } catch {
+    // addCategory stores the category first and then rebuilds the sidebar of the
+    // settings dialog. Before that dialog was opened once, the rebuild throws; the
+    // category is stored anyway and appears when the dialog is built.
+  }
   new Setting(SETTING_IDS.active, {
     name: 'Active environment',
     category: SETTINGS_CATEGORY,
