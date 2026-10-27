@@ -35,8 +35,3 @@ export function defaultSnapshot(): EnvironmentSnapshot {
 export function requiresConfirmation(from: ProfileId, to: ProfileId): boolean {
   return to === 'prod' && from !== 'prod';
 }
-
-/** The label of the "Vulpes" menu, which shows the active environment. */
-export function environmentLabel(active: ProfileId): string {
-  return active === 'prod' ? 'Vulpes (Prod)' : 'Vulpes (Dev)';
-}
