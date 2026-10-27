@@ -1,0 +1,26 @@
+schema: spec-driven
+
+# Project context (shown to AI when creating artifacts)
+context: |
+  Project: vulpes-blockbench, a Blockbench desktop plugin (Electron app only,
+  `variant: 'desktop'`). It is a single-file JavaScript plugin registered with
+  `Plugin.register`. Designers open and save `.bbmodel` files from and to Vulpes.
+  Vulpes is the CMS for Minecraft server content; its backend is Vulpes-Backend
+  (Micronaut). The plugin talks only to the Blockbench API of Vulpes-Backend under
+  `/blockbench/v1`, which is a separate API from the web UI API. The contract is
+  part of each change, so keep specs and tasks in line with it.
+  Sign-in uses the OAuth 2.0 Device Authorization Grant (RFC 8628) against the OIDC
+  identity provider that Stelaris (the Vulpes web UI) uses. Issuer and client id
+  are plugin settings, never hard-coded.
+  All repository content is written in English: specs, designs, tasks, README and
+  code comments.
+  Commits and pull request titles follow Conventional Commits:
+  `type(scope): imperative summary`, lower case, no trailing period.
+
+# Per-artifact rules
+rules:
+  proposal:
+    - "Name the Conventional Commits type and scope the change ships under in the first line, as `Ships as type(scope): summary`."
+    - A change that mixes commit types is two changes.
+  tasks:
+    - The last task opens the pull request under the proposal's title.
