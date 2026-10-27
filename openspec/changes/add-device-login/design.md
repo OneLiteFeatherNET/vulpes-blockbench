@@ -2,7 +2,7 @@
 
 ## Context
 
-The plugin runs inside the Blockbench desktop app, which is an Electron application. It is a single-file JavaScript plugin registered with `Plugin.register`, with `variant: 'desktop'` in its manifest. The web version of Blockbench is out of scope.
+The plugin runs inside the Blockbench desktop app, which is an Electron application. It is a strict TypeScript plugin, bundled by esbuild into one plugin file that calls `Plugin.register`, with `variant: 'desktop'` in its registration. The build is set up by `add-build-toolchain`. The web version of Blockbench is out of scope.
 
 Vulpes-Backend validates bearer tokens from the identity provider that Stelaris uses. The plugin therefore needs a token from that provider, and it needs one without handling the designer's password. The OAuth 2.0 Device Authorization Grant (RFC 8628) fits this: the plugin asks for a device code, shows the designer a short user code, and polls while the designer approves the request in the system browser.
 
@@ -24,6 +24,13 @@ Vulpes-Backend validates bearer tokens from the identity provider that Stelaris 
 The plugin reads `<issuer>/.well-known/openid-configuration` to find the device authorization endpoint and the token endpoint. Discovery keeps the issuer as the only identity setting. If the provider does not publish discovery metadata, the endpoints become settings. This is an assumption to confirm with the provider owner.
 
 The plugin requests the scopes `openid offline_access` plus any scope the backend needs. `offline_access` is required for a refresh token. The backend scope is open and listed in Open Questions.
+
+### Network access from the renderer
+The plugin calls the identity provider with `fetch` from the Blockbench renderer. The spike in task 1.0 checks that these calls are not blocked by CORS and that the response bodies can be read.
+
+Using Node modules through `requireNativeModule` instead of `fetch` is rejected. Designers would have to accept a permission prompt for the plugin, and calls outside `fetch` cannot be tested with the fake `fetch` that the flow modules use.
+
+If CORS blocks a call, the fix is on the identity provider side, not in the plugin. The provider's client must allow the Blockbench origin, which the spike records, for the discovery, device authorization and token endpoints. This is an identity provider configuration change, tracked outside this repository. This follows the decision in `add-remote-models`, which applies it to the Vulpes backend.
 
 ### Settings are validated, not defaulted
 The three settings start empty. The plugin rejects an issuer that is not an `https` URL, except `http://localhost` for local development. Sign in is disabled until all three settings are valid. A value that is never stored in the plugin code is never logged.

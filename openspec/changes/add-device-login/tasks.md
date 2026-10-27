@@ -1,8 +1,9 @@
 # Tasks
 
-## 1. Plugin skeleton and settings
+## 1. Spike, plugin skeleton and settings
 
-- [ ] 1.1 Create the plugin manifest and the entry file with `variant: 'desktop'`, registration and unregistration. Add a unit test that asserts the manifest declares the desktop variant, and verify that it passes
+- [ ] 1.0 Spike: verify that `fetch` from the Blockbench desktop renderer to the issuer's discovery document, device authorization endpoint and token endpoint is not blocked by CORS, and that the response bodies can be read. Record the result and the Blockbench origin in the design. If a call is blocked, apply the fallback in `design.md` (Network access from the renderer) before task 2.1
+- [ ] 1.1 Complete the plugin registration in `src/plugin.ts`, which `add-build-toolchain` created, with `variant: 'desktop'`, registration and unregistration. Add a unit test that asserts the manifest declares the desktop variant, and verify that it passes
 - [ ] 1.2 Add the settings for backend URL, issuer and client id, empty by default. Validate the issuer as `https` or `http://localhost`, and keep sign-in disabled while a setting is invalid. Cover the validation with unit tests and verify that they pass
 
 ## 2. Device flow

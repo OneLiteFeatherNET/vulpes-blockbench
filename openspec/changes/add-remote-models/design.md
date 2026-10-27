@@ -37,6 +37,8 @@ The codec round trip is also verified: `Codecs.project.compile()` must produce t
 
 The spike also checks where the remote reference survives: autosave, Save As to a local file, and a restart of Blockbench. Each task after the spike depends on its result. If the spike shows that the save cannot be routed, the design is revised before the save tasks start.
 
+The spike also checks whether `fetch` from the Blockbench renderer to the Vulpes backend is blocked by CORS, and whether the response headers `ETag` and `Location` are readable. If either check fails, the fallback in "Network access" applies, and the backend change is in place before the save tasks start.
+
 ### Spike outcome
 
 _To be filled in by the spike._
@@ -56,7 +58,7 @@ The plugin stores the `ETag` value exactly as the backend returns it, including 
 Ctrl+S sends `PUT` with `If-Match` set to the stored ETag. On `200`, the new ETag replaces the stored one. On `412`, the conflict dialog opens. On any other error, the local project and the stored ETag stay as they were.
 
 ### Conflict choices
-- **Overwrite**: fetch the current model with `GET` to read its ETag, then send `PUT` with that ETag. The 412 body already carries `currentEtag`, so the `GET` could be skipped. The owner chose to re-fetch. This is kept for now, and the choice is listed in the open questions.
+- **Overwrite**: send `PUT` with `If-Match` set to `currentEtag` from the 412 body, without a `GET` first. The backend returns `currentEtag` already quoted, so the plugin sends it exactly as received. If this `PUT` gets `412` again, the conflict dialog opens again, and nothing else is sent.
 - **Load latest**: fetch the model, replace the content of the local project and update the stored ETag. The dialog asks for confirmation, because local changes are lost.
 - **Save as copy**: ask for a new key and create a new model with `POST`. On `201`, the reference points to the new model. The old model in Vulpes is not changed.
 
@@ -86,14 +88,19 @@ Every call goes through `authorizedFetch`. A `401` that survives the one retry i
 ### Network failures keep local work
 A request that gets no response, or a timeout, shows "Vulpes cannot be reached". It changes nothing locally. The designer can save again later.
 
+### Network access
+Requests run with `fetch` in the Blockbench renderer, through `authorizedFetch`. Using Node modules through `requireNativeModule` instead is rejected. Designers would have to accept a permission prompt for the plugin, and calls outside `fetch` cannot be tested with the fake `fetch` that the client uses.
+
+If the spike shows that CORS blocks the requests, or that `ETag` or `Location` cannot be read, the fallback is decided and is a backend change: the backend allows the Blockbench origin (the origin the spike records) for the request headers `Authorization`, `If-Match` and `Content-Type`, and exposes the response headers `ETag` and `Location`. The change is tracked outside this repository. The plugin does not work around it.
+
 ### Local export stays local
 File > Export and Save As to a file do not contact Vulpes. The designer is asked whether the project should stay linked to the remote model. The default is to keep the link.
 
 ## Contract notes
 
-These points are not settled by the contract and are raised for the backend owner:
+These points are not settled by the contract. Point 1 is decided (see "Network access"). The others are raised for the backend owner:
 
-1. **CORS and headers**: if the requests run in the Blockbench renderer, the browser's CORS rules apply. The backend must allow the Blockbench origin for `Authorization`, `If-Match` and `Content-Type`, and must expose `ETag` and `Location`. Without `Access-Control-Expose-Headers`, the plugin cannot read the ETag. This is a backend change.
+1. **CORS and headers**: decided. The backend allows the Blockbench origin for `Authorization`, `If-Match` and `Content-Type`, and exposes `ETag` and `Location`, if the spike shows that this is needed. This is a backend change, tracked outside this repository.
 2. **ETag source**: the contract does not say which bytes the SHA-1 covers. The plugin only needs the value to round-trip, so this does not block the plugin, but a mismatch after a save would surface as a permanent conflict.
 3. **Key grammar**: `invalid-key` is listed, but the grammar of a resource location is not. Client-side checks would duplicate the backend rule.
 4. **Retry after lost POST**: if the network fails after the backend stored the model, a retry of "Save to Vulpes" gets `key-taken`. The message must explain this, and it must tell the designer to open the model instead.
@@ -108,6 +115,9 @@ These points are not settled by the contract and are raised for the backend owne
 
 ## Open Questions
 
-- Should Overwrite skip the `GET` and use `currentEtag` from the 412 body?
 - Does Save As to a file unlink the remote model, or does it keep the link? The default is to keep it.
 - Where is the reference kept across a restart, if the spike shows that project state is not saved?
+
+## Future work
+
+Not part of this change. A diff view in the conflict dialog would compare the local model with the current Vulpes version and show which elements, groups, textures and animations differ. With that view the designer can choose between Overwrite, Load latest and Save as copy knowingly. It gets its own change later.

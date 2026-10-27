@@ -34,7 +34,7 @@ None. This repository has no existing specs.
 
 ## Impact
 
-- **Code**: the first plugin source and manifest of this repository. Both are created by the implementation tasks.
+- **Code**: the sign-in, token and settings modules under `src/`, and the registration in `src/plugin.ts`. The TypeScript toolchain comes from `add-build-toolchain`.
 - **Identity provider**: the client must be allowed to use the device flow, and the provider must issue refresh tokens for the scopes the backend requires.
 - **Backend**: none in this change. The backend accepts bearer tokens in a separate change.
 - **Security**: tokens are kept in browser storage that the local user profile can read. The trade-off is documented in `design.md`.

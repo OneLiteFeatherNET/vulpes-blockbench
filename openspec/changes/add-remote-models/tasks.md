@@ -5,7 +5,8 @@
 - [ ] 1.1 Verify whether Ctrl+S and File > Save can be routed to Vulpes for a remote project, using `Blockbench.on('save_project')`, a custom `Codec` or `Project.save_path`. Record the result
 - [ ] 1.2 Verify that `Codecs.project.compile()` and `Codecs.project.load()` (or `parse`) round-trip a `.bbmodel` without losing data. Record the result
 - [ ] 1.3 Verify where the remote reference survives autosave, Save As to a local file and a restart of Blockbench, and whether it leaks into exported files. Record the result
-- [ ] 1.4 Write the outcome in the "Spike outcome" section of `design.md`, and adjust tasks 2 to 6 if the outcome changes the design
+- [ ] 1.4 Verify whether `fetch` from the Blockbench renderer to the Vulpes backend is blocked by CORS, and whether the response headers `ETag` and `Location` are readable. If either fails, the backend change in `design.md` (Network access) is made before task 2 and is tracked outside this repository. Record the result and the Blockbench origin
+- [ ] 1.5 Write the outcome in the "Spike outcome" section of `design.md`, and adjust tasks 2 to 6 if the outcome changes the design
 
 ## 2. Vulpes API client
 
@@ -28,7 +29,7 @@
 ## 5. Save to Vulpes (existing model)
 
 - [ ] 5.1 Route Ctrl+S and File > Save for remote projects to `PUT` with the stored ETag, as the spike outcome allows. Replace the stored ETag on `200`
-- [ ] 5.2 Open the conflict dialog on `412` with Overwrite, Load latest (with confirmation) and Save as copy, and implement each choice
+- [ ] 5.2 Open the conflict dialog on `412` with Overwrite, Load latest (with confirmation) and Save as copy, and implement each choice. Overwrite sends `PUT` with `currentEtag` from the 412 body as `If-Match`, without a `GET`, and opens the conflict dialog again on a second `412`. Test each path with a fake `fetch`
 - [ ] 5.3 Keep the local project and the stored ETag unchanged on a network error or any other error, and show the mapped message
 - [ ] 5.4 Verify that File > Export and Save As to a file send nothing to Vulpes
 

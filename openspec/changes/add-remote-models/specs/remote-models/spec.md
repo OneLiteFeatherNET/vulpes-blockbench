@@ -60,7 +60,11 @@ The plugin SHALL open a conflict dialog when the backend responds with `precondi
 
 #### Scenario: Designer overwrites
 - **WHEN** the designer chooses Overwrite in the conflict dialog
-- **THEN** the plugin fetches the current ETag of the model and sends the local JSON with `PUT` using that ETag
+- **THEN** the plugin sends the local JSON with `PUT` and `If-Match` set to the `currentEtag` from the `412` body, exactly as received, and sends no `GET` before it
+
+#### Scenario: Overwrite meets a newer version again
+- **WHEN** the designer chooses Overwrite and the `PUT` responds with `412`
+- **THEN** the plugin opens the conflict dialog again with the new `currentEtag`, and sends nothing else
 
 #### Scenario: Designer loads the latest version
 - **WHEN** the designer chooses Load latest and confirms that local changes are lost
