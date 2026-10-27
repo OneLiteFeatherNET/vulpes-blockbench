@@ -49,4 +49,11 @@ export default tseslint.config(
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
     },
   },
+  {
+    // Callbacks of the Blockbench API return nothing, so `void` appears in their types.
+    files: ['src/types/**/*.d.ts'],
+    rules: {
+      '@typescript-eslint/no-invalid-void-type': 'off',
+    },
+  },
 );
