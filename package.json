@@ -1,6 +1,6 @@
 {
   "name": "vulpes-blockbench",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Blockbench desktop plugin that opens and saves .bbmodel files from and to Vulpes.",
   "private": true,
   "type": "module",
