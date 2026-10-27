@@ -9,12 +9,15 @@ declare class EditSession {
   hosting: boolean;
   token?: string;
   username?: string;
+  /** The PeerJS peer, set by start and join. The plugin compares its identity only. */
+  peer?: unknown;
   /** The connected peers, keyed by their id. */
   clients: Record<string, unknown>;
   client_count: number;
   /** Hosts a session. The username is a placeholder name when omitted. */
   start(username?: string): void;
-  join(username: string, token: string): void;
+  /** Joins with the token. An empty username takes a placeholder name, as in start. */
+  join(username: string | undefined, token: string): void;
   quit(): void;
   /** `ip` is the signaling host used by start and join. Placeholder names fill in a missing username, and max_chat_length limits chat text. */
   static defaults: {

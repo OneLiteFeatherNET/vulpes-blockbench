@@ -125,8 +125,8 @@ interface MessageBoxOptions {
 declare const Blockbench: {
   showQuickMessage: (message: string, time?: number) => void;
   showMessageBox: (options: MessageBoxOptions, callback?: (button: number | string) => void) => void;
-  /** Subscribes to a Blockbench event. The returned object removes the listener. */
-  on: (event: string, callback: () => void) => { delete(): void };
+  /** Subscribes to a Blockbench event. The callback gets the event data, which is untrusted and must be checked. The returned object removes the listener. */
+  on: (event: string, callback: (data: unknown) => void) => { delete(): void };
   /** Adds a stylesheet (js/api.ts:245). The returned handle removes it again. */
   addCSS: (css: string, layer?: string) => { delete(): void };
   /** Asks for one line of text. The callback gets the text, or a non-text value when the prompt is cancelled. */
@@ -174,6 +174,8 @@ interface BlockbenchProject {
   save_path: string;
   export_path: string;
   export_codec: string;
+  /** The live edit session of the project, set by `new EditSession()` and by a joined model (js/io/project.ts:155). */
+  EditSession?: EditSession | null;
   select(): void;
   close(force?: boolean): Promise<boolean>;
 }

@@ -2,7 +2,8 @@
 // uses. The web globals come from the Node type package, which the project's
 // type environment already includes; the DOM library stays off.
 
-import type { FetchLike, HttpRequest, MultipartBody } from '../api/http';
+import type { HttpRequest, HttpResponse, MultipartBody } from '../api/http';
+import type { LiveHttpMethod } from '../live/registration';
 
 function formDataOf(body: MultipartBody): FormData {
   const form = new FormData();
@@ -17,7 +18,12 @@ function formDataOf(body: MultipartBody): FormData {
  * The renderer's fetch, called as a plain function. Calling it as a property of
  * another object throws "Illegal invocation" in Electron, so it is wrapped here.
  */
-export const rendererFetch: FetchLike = async (request: HttpRequest) => {
+/** The methods of the Vulpes client (GET, POST, PUT) and of the registry (GET, PUT, DELETE). */
+export interface RendererRequest extends Omit<HttpRequest, 'method'> {
+  readonly method: HttpRequest['method'] | LiveHttpMethod;
+}
+
+export const rendererFetch = async (request: RendererRequest): Promise<HttpResponse> => {
   const response = await fetch(request.url, {
     method: request.method,
     headers: { ...request.headers },
