@@ -2,6 +2,7 @@
 // sets `If-Match`, and it never sends a replacement without a valid ETag.
 
 import { parseJsonText } from '../json';
+import { fileNameForKey } from '../link/display-name';
 import { problemFromResponse, type ApiFailure } from '../problem';
 import { parseAssetPage, parseAssetSummary, parseProjectPage, type AssetSummary, type Page, type ProjectSummary } from './dto';
 import { parseEntityTag, type FetchLike, type HttpRequest, type MultipartBody } from './http';
@@ -34,12 +35,6 @@ export interface VulpesClient {
   readModel(projectId: string, assetId: string): Promise<ApiResult<VersionedText>>;
   createModel(projectId: string, key: string, text: string): Promise<ApiResult<StoredModel>>;
   replaceModel(projectId: string, assetId: string, ifMatch: string, key: string, text: string): Promise<ApiResult<StoredModel>>;
-}
-
-/** The file name a model gets from its key: the last segment with `.bbmodel`. */
-export function fileNameForKey(key: string): string {
-  const segment = key.split(/[/:]/u).pop() ?? '';
-  return `${segment === '' ? 'model' : segment}.bbmodel`;
 }
 
 type Exchange =
