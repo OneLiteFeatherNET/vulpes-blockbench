@@ -39,6 +39,11 @@
 - [ ] 5.3 Test a conflict with a stale `ETag` after a save by another participant, and check that the existing conflict choices appear
 - [ ] 5.4 Test that the feature shows "not available" against a backend without the routes
 
-## 6. Open the code pull request
+## 6. Stream lifecycle and own saves
 
-- [ ] 6.1 Open the code pull request titled `feat(session): edit models live in vulpes-coordinated edit sessions` from the implementation branch, with no file under `openspec/`, after the proposal pull request is merged
+- [ ] 6.1 Reconnect the `events` stream after it ends or fails, with the backoff of design.md (1 second, doubling, capped at 30 seconds, back to 1 second after data). Test the policy as a pure unit, and the lifecycle with a fake fetch and fake timers: reconnect after a drop, no reconnect after close, no reconnect without the routes
+- [ ] 6.2 Hold the `saved` events of an asset while an own save of it is in flight, drop the echo that carries the save's ETag, release the others when the save ends, and release all of them when it fails. Test the hold as a pure unit, and that a `saved` event whose ETag the link already holds changes nothing
+
+## 7. Open the code pull request
+
+- [ ] 7.1 Open the code pull request titled `feat(session): edit models live in vulpes-coordinated edit sessions` from the implementation branch, with no file under `openspec/`, after the proposal pull request is merged

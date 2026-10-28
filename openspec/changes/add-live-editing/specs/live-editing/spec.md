@@ -70,6 +70,45 @@ While a linked model is open, the plugin SHALL listen to the `saved` events of i
 - **WHEN** a save still returns `412` after the held `ETag` was updated
 - **THEN** the existing conflict choices of the save apply
 
+#### Scenario: Echo of an own save is held and dropped
+- **WHEN** a `saved` event for the asset arrives while a save of a project linked to it is in flight, and its `ETag` is the `ETag` that the save returns
+- **THEN** the plugin drops the event once the save has returned, and shows no message
+
+#### Scenario: Other event is processed after an own save
+- **WHEN** a `saved` event with another `ETag` arrives while an own save is in flight
+- **THEN** the plugin processes that event when the save has returned, as a save by another participant
+
+#### Scenario: Held events are processed when the own save fails
+- **WHEN** a save of a linked project fails while a `saved` event for its asset is held
+- **THEN** the plugin processes the held event as a save by another participant
+
+#### Scenario: Known ETag is ignored
+- **WHEN** a `saved` event carries the `ETag` that the link already holds
+- **THEN** the plugin updates nothing and shows no message
+
+### Requirement: Keep the event stream open
+The plugin SHALL reopen the `events` stream of the linked asset when the stream ends or its request fails, for any reason other than the plugin closing the stream. The delay before a reopen SHALL be 1 second after the first drop, double on each further attempt and not exceed 30 seconds. The delay SHALL return to 1 second once a reopened stream has delivered data.
+
+#### Scenario: Stream ends
+- **WHEN** the `events` stream of the linked asset ends
+- **THEN** the plugin opens it again after 1 second
+
+#### Scenario: Reconnect keeps failing
+- **WHEN** each reopened stream fails before it delivers data
+- **THEN** the plugin waits 2, 4, 8, 16 and then 30 seconds, and keeps waiting 30 seconds between attempts
+
+#### Scenario: Reopened stream delivers data
+- **WHEN** a reopened stream delivers data and then ends
+- **THEN** the plugin opens it again after 1 second
+
+#### Scenario: No reconnect after abort
+- **WHEN** the linked project changes to another asset or closes while the stream is open or waiting to reconnect
+- **THEN** the plugin aborts the stream, clears the pending reconnect and does not open the stream again for that asset
+
+#### Scenario: No reconnect without the routes
+- **WHEN** the `events` route answers `404` without a problem code
+- **THEN** the plugin does not reopen the stream and shows that live editing is not available on this backend
+
 ### Requirement: Feature availability
 The plugin SHALL show that live editing is not available on this backend when the live-session routes or the `events` stream answer `404` without a problem code, and SHALL keep the rest of the plugin working.
 
