@@ -29,6 +29,10 @@ describe('decideEtagPropagation', () => {
     expect(decide([link('a')]).announcement, 'the announcement').toEqual({ revision: 4 });
   });
 
+  it('ignores a saved event whose ETag the only link already holds, without update or message', () => {
+    expect(decide([link('a', { etag: NEW })]), 'the decision').toEqual({ updates: [], announcement: undefined });
+  });
+
   it('does not announce an own save, because the saving link already holds the new ETag', () => {
     expect(decide([link('a', { etag: NEW })]).announcement, 'the announcement').toBeUndefined();
   });

@@ -10,6 +10,7 @@ import { decideEtagPropagation, type LocalLink } from '../live/etag-propagation'
 import { openEventStream, type EventStream } from '../live/event-stream';
 import { createLiveRegistryClient, isRegistrationConflict, type LiveRegistryClient } from '../live/registration';
 import { createRefreshScheduler, type RefreshScheduler } from '../live/refresh';
+import { createOwnSaves, type OwnSaveOutcome } from '../live/own-saves';
 import { initialSessionView, reduceSessionView, type SessionView, type ViewEvent } from '../live/session-state';
 import type { LinkRecord } from '../link/link-state';
 import { describeFailure, type ApiFailure } from '../problem';
@@ -46,12 +47,20 @@ interface FollowedAsset {
   readonly stream: EventStream;
 }
 
+/** A `saved` event held while an own save of its asset is in flight, with the link it was received for. */
+interface HeldSave {
+  readonly record: LinkRecord;
+  readonly saved: SavedEvent;
+}
+
 interface LiveEditing {
   start(project: BlockbenchProject): void;
   join(project: BlockbenchProject): void;
   leave(): void;
   view(): SessionView;
   backendUnsupported(baseUrl: string): boolean;
+  beginOwnSave(record: LinkRecord): void;
+  finishOwnSave(record: LinkRecord, outcome: OwnSaveOutcome): void;
   dispose(): void;
 }
 
@@ -93,6 +102,8 @@ function createLiveEditing(): LiveEditing {
   let held: HeldRegistration | undefined;
   let scheduler: RefreshScheduler | undefined;
   let stream: FollowedAsset | undefined;
+  // The own saves in flight and the `saved` events they hold back. An echo of an own save is never announced.
+  const ownSaves = createOwnSaves<HeldSave>();
   // The base URL of a backend without the live-session routes. Nothing is retried against it.
   let unsupportedBase: string | undefined;
   let handles: { delete(): void }[] = [];
@@ -339,7 +350,9 @@ function createLiveEditing(): LiveEditing {
 
   const handleEvent = (event: LiveEvent, record: LinkRecord): void => {
     if (event.kind === 'saved') {
-      announceSave(event.saved, record);
+      if (!ownSaves.hold(assetKey(record), event.saved.etag, { record, saved: event.saved })) {
+        announceSave(event.saved, record);
+      }
       return;
     }
     onSessionEvent(event.session, record);
@@ -427,6 +440,14 @@ function createLiveEditing(): LiveEditing {
     leave,
     view: () => view,
     backendUnsupported: (baseUrl) => unsupportedBase === baseUrl,
+    beginOwnSave: (record) => {
+      ownSaves.begin(assetKey(record));
+    },
+    finishOwnSave: (record, outcome) => {
+      for (const held of ownSaves.finish(assetKey(record), outcome)) {
+        announceSave(held.saved, held.record);
+      }
+    },
     dispose,
   };
 }
@@ -468,4 +489,14 @@ export function liveSessionView(): SessionView {
 /** True when the backend at this base URL answered that the live-session routes do not exist. */
 export function liveBackendUnsupported(baseUrl: string): boolean {
   return current?.backendUnsupported(baseUrl) ?? false;
+}
+
+/** Marks an own save of a linked asset as started. Its `saved` echo is held until finishOwnSave. */
+export function beginOwnSave(record: LinkRecord): void {
+  current?.beginOwnSave(record);
+}
+
+/** Marks an own save of a linked asset as ended and releases the held events that are not its echo. */
+export function finishOwnSave(record: LinkRecord, outcome: OwnSaveOutcome): void {
+  current?.finishOwnSave(record, outcome);
 }
