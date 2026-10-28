@@ -3,10 +3,12 @@
 
 import { coreTranslations } from '../i18n/core';
 import { itemTranslations } from '../i18n/items';
+import { liveTranslations } from '../i18n/live';
 import { panelTranslations } from '../i18n/panel';
 import { registerAssignItemAction } from './assign-item';
 import { revisionTranslations } from '../i18n/revisions';
 import { registerFileActions } from './file-actions';
+import { registerLiveEditing } from './live-editing';
 import { registerModelLoader } from './model-loader';
 import { createPanelHost } from './panel-host';
 import { createVulpesPanel } from './panel/vulpes-panel';
@@ -18,13 +20,13 @@ import { registerRevisionActions } from './revisions';
 let removals: (() => void)[] = [];
 
 function registerTranslations(): void {
-  Language.addTranslations('en', { ...coreTranslations.en, ...panelTranslations.en, ...itemTranslations.en, ...revisionTranslations.en });
-  Language.addTranslations('de', { ...coreTranslations.de, ...panelTranslations.de, ...itemTranslations.de, ...revisionTranslations.de });
+  Language.addTranslations('en', { ...coreTranslations.en, ...panelTranslations.en, ...itemTranslations.en, ...liveTranslations.en, ...revisionTranslations.en });
+  Language.addTranslations('de', { ...coreTranslations.de, ...panelTranslations.de, ...itemTranslations.de, ...liveTranslations.de, ...revisionTranslations.de });
 }
 
 export function mountVulpesUi(): void {
   registerTranslations();
-  const registered = [registerVulpesCodec(), registerPluginSettings(), registerFileActions(), registerRevisionActions(), registerModelLoader(), registerAssignItemAction()];
+  const registered = [registerVulpesCodec(), registerPluginSettings(), registerFileActions(), registerRevisionActions(), registerModelLoader(), registerAssignItemAction(), registerLiveEditing()];
   // The panel comes last: it reads the settings and the actions when it is created.
   const panel = createVulpesPanel(createPanelHost());
   removals = [...registered, () => {

@@ -2,6 +2,7 @@
 // the key and the ETag are held here in memory, by project uuid. A restart drops them,
 // so a linked project refuses to save until it is opened from Vulpes again.
 
+import { parseEntityTag } from '../api/http';
 import { linkedRecord, type LinkRecord } from '../link/link-state';
 import { buildVulpesPath, parseVulpesPath } from '../link/vulpes-path';
 
@@ -37,6 +38,19 @@ export function linkOf(project: BlockbenchProject): LinkRecord | undefined {
     return undefined;
   }
   return linkedRecord(parseVulpesPath(project.export_path), records.get(project.uuid));
+}
+
+/**
+ * Replaces the ETag held for a project, after a save by another participant. Returns false when
+ * the project holds no record or the value is not a strong ETag, so nothing is changed.
+ */
+export function updateHeldEtag(uuid: string, etag: string): boolean {
+  const record = records.get(uuid);
+  if (record === undefined || parseEntityTag(etag) === undefined) {
+    return false;
+  }
+  records.set(uuid, { ...record, etag });
+  return true;
 }
 
 /** Clears the link of every open project, so no vulpes:// path is left for a codec that is gone. */

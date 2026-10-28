@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AssetSummary, ProjectSummary } from '../../../src/api/dto';
+import type { SessionView } from '../../../src/live/session-state';
 import type { ModelPage, PanelEnvironment, PanelLink, PanelResult, VulpesPanelHost } from '../../../src/ui/panel/host';
 import {
   createPanelController,
@@ -57,6 +58,14 @@ interface FakeHost {
   nextModels: (projectId: string, page: number) => Promise<PanelResult<ModelPage>>;
   openResult: () => Promise<void>;
   testResult: () => Promise<void>;
+  session: SessionView;
+  environmentAvailable: boolean;
+  backendAvailable: boolean;
+  startResult: PanelResult<void>;
+  joinResult: PanelResult<void>;
+  startCount: number;
+  joinCount: number;
+  leaveCount: number;
 }
 
 function fakeHost(env: PanelEnvironment = { id: 'dev', configured: true }): FakeHost {
@@ -75,6 +84,14 @@ function fakeHost(env: PanelEnvironment = { id: 'dev', configured: true }): Fake
     nextModels: () => Promise.resolve(ok({ items: [], hasMore: false })),
     openResult: () => Promise.resolve(),
     testResult: () => Promise.resolve(),
+    session: { kind: 'none' },
+    environmentAvailable: true,
+    backendAvailable: true,
+    startResult: ok(undefined),
+    joinResult: ok(undefined),
+    startCount: 0,
+    joinCount: 0,
+    leaveCount: 0,
   };
   const host: VulpesPanelHost = {
     activeEnvironment: () => fake.env,
@@ -95,6 +112,18 @@ function fakeHost(env: PanelEnvironment = { id: 'dev', configured: true }): Fake
       fake.saveCount++;
     },
     currentLink: () => fake.link,
+    liveSnapshot: () => ({ environmentAvailable: fake.environmentAvailable, backendAvailable: fake.backendAvailable, session: fake.session }),
+    startLive: () => {
+      fake.startCount++;
+      return fake.startResult;
+    },
+    joinLive: () => {
+      fake.joinCount++;
+      return fake.joinResult;
+    },
+    leaveLive: () => {
+      fake.leaveCount++;
+    },
     onChange: (listener) => {
       fake.changeListeners.push(listener);
       return () => {
@@ -453,5 +482,148 @@ describe('panel controller', () => {
     const controller = controllerFor(fake);
 
     expect(controller.current().link).toEqual({ kind: 'linked', environment: 'dev', key: 'x' });
+  });
+});
+
+describe('live section', () => {
+  function linkedFake(): FakeHost {
+    const fake = fakeHost();
+    fake.link = { environment: 'dev', key: 'Castle/Gate' };
+    return fake;
+  }
+
+  it('shows the hint to save first and no session action while the project is not linked', () => {
+    const fake = fakeHost();
+    const controller = controllerFor(fake);
+
+    expect(controller.current().live.state).toEqual({ kind: 'not-linked' });
+  });
+
+  it('offers to start a session for a linked model without a registered session', () => {
+    const controller = controllerFor(linkedFake());
+
+    expect(controller.current().live.state).toEqual({ kind: 'idle' });
+  });
+
+  it('moves from none to available when another host registers a session', async () => {
+    const fake = linkedFake();
+    const controller = controllerFor(fake);
+
+    fake.session = { kind: 'available', host: 'localhost', token: 'token-1' };
+    await controller.onHostChange();
+
+    expect(lastView(fake).live.state).toEqual({ kind: 'available', host: 'localhost' });
+  });
+
+  it('moves from available to joining to joined when the designer joins', async () => {
+    const fake = linkedFake();
+    const controller = controllerFor(fake);
+    fake.session = { kind: 'available', host: 'localhost', token: 'token-1' };
+    await controller.onHostChange();
+
+    controller.joinLive();
+    expect(fake.joinCount).toBe(1);
+    fake.session = { kind: 'joining', host: 'localhost', token: 'token-1' };
+    await controller.onHostChange();
+    expect(lastView(fake).live.state).toEqual({ kind: 'joining' });
+
+    fake.session = { kind: 'joined', host: 'localhost', token: 'token-1' };
+    await controller.onHostChange();
+    expect(lastView(fake).live.state).toEqual({ kind: 'joined' });
+  });
+
+  it('shows the participant count while this instance hosts the session', async () => {
+    const fake = linkedFake();
+    const controller = controllerFor(fake);
+
+    fake.session = { kind: 'hosting', token: 'token-1', participants: 3 };
+    await controller.onHostChange();
+
+    expect(lastView(fake).live.state).toEqual({ kind: 'hosting', participants: 3 });
+  });
+
+  it('shows that live editing is not available in this environment and starts nothing', () => {
+    const fake = linkedFake();
+    fake.environmentAvailable = false;
+    const controller = controllerFor(fake);
+
+    controller.startLive();
+
+    expect(fake.startCount).toBe(0);
+    expect(controller.current().live.state).toEqual({ kind: 'unavailable', reason: 'environment' });
+  });
+
+  it('shows that live editing is not available on this backend and joins nothing', async () => {
+    const fake = linkedFake();
+    const controller = controllerFor(fake);
+    fake.session = { kind: 'available', host: 'localhost', token: 'token-1' };
+    await controller.onHostChange();
+    fake.backendAvailable = false;
+
+    controller.joinLive();
+    await controller.onHostChange();
+
+    expect(fake.joinCount).toBe(0);
+    expect(lastView(fake).live.state).toEqual({ kind: 'unavailable', reason: 'backend' });
+  });
+
+  it('forwards a start to the host once', () => {
+    const fake = linkedFake();
+    const controller = controllerFor(fake);
+
+    controller.startLive();
+
+    expect(fake.startCount).toBe(1);
+  });
+
+  it('keeps the state and shows the message when the host refuses the start', () => {
+    const fake = linkedFake();
+    fake.startResult = fail('Link this project to Vulpes first');
+    const controller = controllerFor(fake);
+
+    controller.startLive();
+
+    expect(controller.current().live.state).toEqual({ kind: 'idle' });
+    expect(controller.current().live.error).toBe('Link this project to Vulpes first');
+  });
+
+  it('starts nothing while a session is already running', async () => {
+    const fake = linkedFake();
+    fake.session = { kind: 'hosting', token: 'token-1', participants: 1 };
+    const controller = controllerFor(fake);
+    await controller.onHostChange();
+
+    controller.startLive();
+
+    expect(fake.startCount).toBe(0);
+  });
+
+  it('joins nothing when no session is available', () => {
+    const fake = linkedFake();
+    const controller = controllerFor(fake);
+
+    controller.joinLive();
+
+    expect(fake.joinCount).toBe(0);
+  });
+
+  it('forwards leave to the host while a session is running', async () => {
+    const fake = linkedFake();
+    fake.session = { kind: 'hosting', token: 'token-1', participants: 2 };
+    const controller = controllerFor(fake);
+    await controller.onHostChange();
+
+    controller.leaveLive();
+
+    expect(fake.leaveCount).toBe(1);
+  });
+
+  it('forwards nothing on leave while no session is running', () => {
+    const fake = linkedFake();
+    const controller = controllerFor(fake);
+
+    controller.leaveLive();
+
+    expect(fake.leaveCount).toBe(0);
   });
 });

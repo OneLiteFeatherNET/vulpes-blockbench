@@ -5,12 +5,14 @@
 
 import { parseJsonText, isRecord } from '../json';
 import { decideWrite } from '../link/link-state';
+import type { OwnSaveOutcome } from '../live/own-saves';
 import { parseVulpesPath } from '../link/vulpes-path';
 import type { LinkRecord } from '../link/link-state';
 import type { RemoteReference } from '../remote/reference';
 import { createLinked, loadLatest, overwriteLinked, saveLinked, type SaveOutcome } from '../remote/save';
 import { emitVulpesChange } from './change-bus';
 import { conflictMessage, confirmMessage, errorMessage, quickMessage } from './feedback';
+import { beginOwnSave, finishOwnSave } from './live-editing';
 import { placeModel } from './place-model';
 import { attachLink, detachLink, heldRecord, VULPES_CODEC } from './project-link';
 import { clientFor, environmentName, fieldText, messageText, runAction } from './remote-context';
@@ -56,13 +58,40 @@ function writeLinked(project: BlockbenchProject, content: string, path: string, 
       return;
     case 'replace': {
       const record = decision.record;
-      runAction(async () => {
-        const outcome = await saveLinked(clientFor(record.baseUrl), record, content, comment);
-        applyOutcome(project, record, content, outcome, comment);
-      });
+      runAction(() =>
+        trackedSave(
+          record,
+          () => saveLinked(clientFor(record.baseUrl), record, content, comment),
+          (outcome) => { applyOutcome(project, record, content, outcome, comment); },
+        ),
+      );
       return;
     }
   }
+}
+
+/**
+ * Runs one save of a linked record. While it is in flight, the `saved` events of its asset are held,
+ * so the echo of this save is not announced. The held events are released after the outcome is applied,
+ * so the ETag of the link is current when they are processed.
+ */
+async function trackedSave(
+  record: LinkRecord,
+  save: () => Promise<SaveOutcome>,
+  apply: (outcome: SaveOutcome) => void,
+): Promise<void> {
+  beginOwnSave(record);
+  let outcome: SaveOutcome | undefined;
+  try {
+    outcome = await save();
+    apply(outcome);
+  } finally {
+    finishOwnSave(record, ownOutcome(outcome));
+  }
+}
+
+function ownOutcome(outcome: SaveOutcome | undefined): OwnSaveOutcome {
+  return outcome?.kind === 'saved' ? { kind: 'saved', etag: outcome.reference.etag } : { kind: 'failed' };
 }
 
 function withEnvironment(reference: RemoteReference, record: LinkRecord): LinkRecord {
@@ -85,10 +114,13 @@ function applyOutcome(project: BlockbenchProject, record: LinkRecord, content: s
           currentEtag === undefined
             ? undefined
             : () => {
-                runAction(async () => {
-                  const next = await overwriteLinked(clientFor(record.baseUrl), record, content, currentEtag, comment);
-                  applyOutcome(project, record, content, next, comment);
-                });
+                runAction(() =>
+                  trackedSave(
+                    record,
+                    () => overwriteLinked(clientFor(record.baseUrl), record, content, currentEtag, comment),
+                    (next) => { applyOutcome(project, record, content, next, comment); },
+                  ),
+                );
               },
         loadLatest: () => {
           confirmMessage(tl('vulpes.load_latest.title'), tl('vulpes.load_latest.message'), tl('vulpes.load_latest.button'), () => {
