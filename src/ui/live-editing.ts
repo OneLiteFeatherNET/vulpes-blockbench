@@ -3,15 +3,16 @@
 // of the linked asset. The decisions are in src/live/; this file only wires the events, the
 // timers, the stream and the native calls, so the Blockbench globals stay in one place.
 
-import { isRecord, parseJsonText } from '../json';
+import { isRecord } from '../json';
 import { isRouteMissing } from '../live/availability';
-import { createSseParser, decodeLiveEvent, type LiveEvent, type SavedEvent, type SessionEvent } from '../live/events';
+import { type LiveEvent, type SavedEvent, type SessionEvent } from '../live/events';
 import { decideEtagPropagation, type LocalLink } from '../live/etag-propagation';
+import { openEventStream, type EventStream } from '../live/event-stream';
 import { createLiveRegistryClient, isRegistrationConflict, type LiveRegistryClient } from '../live/registration';
 import { createRefreshScheduler, type RefreshScheduler } from '../live/refresh';
 import { initialSessionView, reduceSessionView, type SessionView, type ViewEvent } from '../live/session-state';
 import type { LinkRecord } from '../link/link-state';
-import { describeFailure, problemFromResponse, type ApiFailure } from '../problem';
+import { describeFailure, type ApiFailure } from '../problem';
 import { currentService, storedSignalingHost } from './blockbench-storage';
 import { emitVulpesChange, subscribeVulpesChange } from './change-bus';
 import { errorMessage, quickMessage } from './feedback';
@@ -40,9 +41,9 @@ interface HeldRegistration {
 }
 
 /** The `events` stream of the linked asset. `key` names the asset it follows. */
-interface EventStream {
+interface FollowedAsset {
   readonly key: string;
-  readonly abort: AbortController;
+  readonly stream: EventStream;
 }
 
 interface LiveEditing {
@@ -91,7 +92,7 @@ function createLiveEditing(): LiveEditing {
   let pendingJoin: PendingJoin | undefined;
   let held: HeldRegistration | undefined;
   let scheduler: RefreshScheduler | undefined;
-  let stream: EventStream | undefined;
+  let stream: FollowedAsset | undefined;
   // The base URL of a backend without the live-session routes. Nothing is retried against it.
   let unsupportedBase: string | undefined;
   let handles: { delete(): void }[] = [];
@@ -345,50 +346,8 @@ function createLiveEditing(): LiveEditing {
   };
 
   const closeStream = (): void => {
-    stream?.abort.abort();
+    stream?.stream.close();
     stream = undefined;
-  };
-
-  const followEvents = async (record: LinkRecord, signal: AbortSignal): Promise<void> => {
-    // The stream carries no Authorization header, as the open question in design.md assumes. A fetch
-    // stream, not EventSource, is used because the SSE parser needs the raw text and the 404 status.
-    const response = await fetch(eventsUrl(record), { headers: { Accept: 'text/event-stream' }, signal }).catch((): undefined => undefined);
-    if (response === undefined) {
-      return;
-    }
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      if (isRouteMissing({ kind: 'problem', problem: problemFromResponse(response.status, parseJsonText(body), undefined) })) {
-        unsupportedBase = record.baseUrl;
-        reportUnavailable();
-      }
-      return;
-    }
-    if (response.body === null) {
-      return;
-    }
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    const parser = createSseParser();
-    try {
-      let next = await reader.read();
-      while (!next.done) {
-        // The chunk is untrusted: only bytes are decoded, anything else is skipped.
-        const bytes: unknown = next.value;
-        if (bytes instanceof Uint8Array) {
-          for (const block of parser.push(decoder.decode(bytes, { stream: true }))) {
-            const event = decodeLiveEvent(block);
-            if (event !== undefined) {
-              handleEvent(event, record);
-            }
-          }
-        }
-        next = await reader.read();
-      }
-    } catch {
-      // The stream was aborted (the linked project changed, or Blockbench unloads) or the connection dropped.
-      // A dropped stream is not retried: the next change of the linked project opens it again.
-    }
   };
 
   /** Follows the events of the linked project's asset. Only one stream is open, for the project that is current. */
@@ -406,9 +365,26 @@ function createLiveEditing(): LiveEditing {
     if (unsupportedBase === record.baseUrl) {
       return;
     }
-    const abort = new AbortController();
-    stream = { key, abort };
-    runAction(() => followEvents(record, abort.signal));
+    stream = {
+      key,
+      stream: openEventStream({
+        url: eventsUrl(record),
+        fetch,
+        timers: {
+          setTimeout: (handler, ms) => setTimeout(handler, ms),
+          clearTimeout: (handle) => {
+            clearTimeout(handle);
+          },
+        },
+        onEvent: (event) => {
+          handleEvent(event, record);
+        },
+        onUnsupported: () => {
+          unsupportedBase = record.baseUrl;
+          reportUnavailable();
+        },
+      }),
+    };
     runAction(() => refreshRegistration(record));
   };
 
